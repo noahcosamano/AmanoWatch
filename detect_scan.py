@@ -30,11 +30,12 @@ def detect_scan(packet_queue, stop_event, interval=10, quantity=20):
         unique_ports = {p for (_, p) in activity[src_ip]}
 
         if len(unique_ports) >= quantity:
+            print(unique_ports)
             print("\n🚨 PORT SCAN DETECTED 🚨")
             print(f"Source IP: {src_ip}")
             print(f"{len(unique_ports)} ports hit in {interval} seconds")
             
-            if packet.src_ip.startswith("127."):
+            if packet.src_ip is not None and packet.src_ip.startswith("127."):
                 continue
             else:
                 block_ip(src_ip)
