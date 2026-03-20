@@ -1,6 +1,7 @@
 import pyshark
 import asyncio
 from packet import Packet
+import entropy
 
 packet_list = []
 
@@ -53,14 +54,16 @@ def parse_packet(packet) -> Packet:
             src_port = int(packet.tcp.srcport)
             dst_port = int(packet.tcp.dstport)
 
-            flag_list = []
-            if packet.tcp.flags_syn == '1': flag_list.append("SYN")
-            if packet.tcp.flags_ack == '1': flag_list.append("ACK")
-            if packet.tcp.flags_fin == '1': flag_list.append("FIN")
-            if packet.tcp.flags_reset == '1': flag_list.append("RST")
-            if packet.tcp.flags_push == '1': flag_list.append("PSH")
-            if packet.tcp.flags_urg == '1': flag_list.append("URG")
+            flags_int = int(packet.tcp.flags, 16)
 
+            flag_list = []
+            if flags_int & 0x02: flag_list.append("SYN")
+            if flags_int & 0x10: flag_list.append("ACK")
+            if flags_int & 0x01: flag_list.append("FIN")
+            if flags_int & 0x04: flag_list.append("RST")
+            if flags_int & 0x08: flag_list.append("PSH")
+            if flags_int & 0x20: flag_list.append("URG")
+            
             flags = ",".join(flag_list) if flag_list else None
 
         elif packet.transport_layer == 'UDP':

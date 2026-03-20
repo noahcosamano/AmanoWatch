@@ -10,7 +10,7 @@ def main():
 
     capture_thread = threading.Thread(
         target=capture,
-        args=("Wi-Fi", raw_packet_queue, stop_event),
+        args=(r'\Device\NPF_Loopback', raw_packet_queue, stop_event),
         daemon=True
     )
 
