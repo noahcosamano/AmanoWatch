@@ -1,11 +1,11 @@
 import pyshark
 import asyncio
 from packet import Packet
-import entropy
+from queue import Queue
 
 packet_list = []
 
-def capture(interface, output_queue, stop_event):
+def capture(interface, output_queue):
     print("Capture Starting")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -14,9 +14,6 @@ def capture(interface, output_queue, stop_event):
 
     try:
         for pkt in cap.sniff_continuously():
-            if stop_event.is_set():
-                break
-
             output_queue.put(pkt)
 
     finally:
@@ -82,13 +79,14 @@ def parse_packet(packet) -> Packet:
     
     return pkt
 
-def build_packet_list(input_queue, output_queue, stop_event):
-    while not stop_event.is_set():
+def build_packet_list(input_queue, output_queues: list[Queue]):
+    while True:
         raw_packet = input_queue.get()
 
         try:
             pkt = parse_packet(raw_packet)
-            output_queue.put(pkt)
+            for queue in output_queues:
+                queue.put(pkt)
         except Exception as e:
             print(e)
 
