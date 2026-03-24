@@ -43,6 +43,8 @@ def handle(raw_pkt, packet_queues: list[Queue[Packet]]):
         type, src_ip, dst_ip, src_port, 
         dst_port, flags, time()
     )
+    
+    #print(pkt)
 
     for queue in packet_queues:
         queue.put(pkt)
@@ -69,7 +71,6 @@ def get_type(raw_pkt):
     return None
 
 def capture(interface: str, pkt_queues: list[Queue[Packet]]):
-    print("Capture Started.")
     sniff(
         iface=interface,
         filter="ip",

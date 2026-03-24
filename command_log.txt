@@ -1,0 +1,3 @@
+view
+view tcp
+view tcp -wait=500

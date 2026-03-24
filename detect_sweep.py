@@ -2,8 +2,11 @@ from packet import Packet
 from block import block_ip, unblock_ip
 from gateway import get_gateway
 from queue import Queue
+from log import add_to_log
+import time
 
 def detect_sweep(packet_queue: Queue, interval, quantity, cooldown):
+    message = ""
     gateway = get_gateway()
     last_alert = {}
     activity = {}
@@ -15,13 +18,13 @@ def detect_sweep(packet_queue: Queue, interval, quantity, cooldown):
         now = packet.timestamp
         src_ip = packet.src_ip
         dst_ip = packet.dst_ip
-        protocol = packet.protocol
+        type = packet.type
         
         if not src_ip:
             packet_queue.task_done()
             continue
         
-        if packet.type != 8:
+        if type != 8:
             continue
         
         if src_ip not in activity:
@@ -52,11 +55,15 @@ def detect_sweep(packet_queue: Queue, interval, quantity, cooldown):
 
             last_alert[src_ip] = now
             
-            print("\n🚨 ICMP SWEEP DETECTED 🚨")
-            print(f"Source IP: {src_ip}")
-            print(f"{len(unique_dst)}+ addresses pinged in {interval} seconds")
-
-            print(f"Blocking IP: {src_ip}")
+            message += f"{time.ctime()}\nICMP Sweep\n"
+            message += f"Source IP: {src_ip}\n"
+            message += "\n".join(
+                    f"{time.ctime(t)} | Address: {d}"
+                    for (t, d) in activity[src_ip]
+                )
+            message += f"\nBlocking IP: {src_ip}\n"
+            add_to_log(message, "detection_log.txt")
+    
             block_ip(src_ip)
             activity[src_ip] = []
 

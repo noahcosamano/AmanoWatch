@@ -23,7 +23,7 @@ def main():
 
     capture_thread = threading.Thread(
         target=capture,
-        args=(wifi, [fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue]),
+        args=(loopback, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue]),
         daemon=False
     )
 
@@ -45,6 +45,7 @@ def main():
         daemon=False
     )
 
+    cli_thread.start()
     capture_thread.start()
     fast_scan_thread.start()
     slow_scan_thread.start()
@@ -58,6 +59,7 @@ def main():
 
     print("Program terminating...")
     
+    cli_thread.join()
     capture_thread.join()
     fast_scan_thread.join()
     slow_scan_thread.join()
