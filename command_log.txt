@@ -36,3 +36,26 @@ view
 view tcp
 view tcp
 view tcp d
+view
+view 80
+view 80 -wait
+view
+view tcp
+port
+view port
+view 1.1
+view 80 tcp
+view tcp 80 -wait
+view tcp 80 -wait=500
+
+
+view
+view tcp
+view tcp 80
+view 80
+view tcp
+view 80
+view port
+view 80 -wait=
+view 80 -wait=l
+view 80 -wait=500
