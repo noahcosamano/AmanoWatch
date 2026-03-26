@@ -1,10 +1,10 @@
 from scapy.all import sniff
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from scapy.layers.l2 import Ether
-from config.packet import Packet
+from configurations.packet import Packet
 from queue import Queue
 from time import time
-from proto_nums import protocol_nums
+from configurations.proto_nums import protocol_nums
 
 def handle(raw_pkt, packet_queues: list[Queue[Packet]]):
     if IP not in raw_pkt:

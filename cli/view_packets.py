@@ -2,7 +2,7 @@ import msvcrt
 import time
 import os
 from queue import Empty
-from config.packet import Packet
+from configurations.packet import Packet
 
 def view_proto(packet_queue, proto, stop_event, wait_ms: int):
     selected_proto = proto.upper()

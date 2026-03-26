@@ -1,4 +1,4 @@
-from config.packet import Packet
+from configurations.packet import Packet
 from utilities.block import block_ip, unblock_ip
 from utilities.gateway import get_gateway
 from queue import Queue

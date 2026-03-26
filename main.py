@@ -4,7 +4,7 @@ import time
 from utilities.capture import capture
 from detecting.detect_scan import detect_scan
 from detecting.detect_sweep import detect_sweep
-from cli import start_cli
+from cli.cli import start_cli
 
 loopback = r'\Device\NPF_Loopback'
 wifi = "Wi-Fi"

@@ -1,6 +1,6 @@
 from queue import Queue
 import threading
-from view_packets import view_proto, view_port
+from cli.view_packets import view_proto, view_port
 from logs.log import add_to_log
 import os
 
@@ -101,7 +101,7 @@ def start_cli(packet_queue: Queue):
     while True:
         welcome()
         cmd = input("NIDS> ")
-        add_to_log(f"{cmd}\n", "command_log.txt")
+        add_to_log(f"{cmd}\n", "logs/command_log.txt")
 
         if cmd.lower() == "exit":
             print("Exiting CLI...")

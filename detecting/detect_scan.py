@@ -1,4 +1,4 @@
-from classes.packet import Packet
+from configurations.packet import Packet
 from utilities.block import block_ip, unblock_ip
 from utilities.gateway import get_gateway
 from logs.log import add_to_log
