@@ -44,8 +44,6 @@ def handle(raw_pkt, packet_queues: list[Queue[Packet]]):
         type, src_ip, dst_ip, src_port, 
         dst_port, flags, time()
     )
-    
-    log_event(f"Packet Received: {pkt}")
 
     for queue in packet_queues:
         queue.put(pkt)
@@ -71,12 +69,13 @@ def get_type(raw_pkt):
         return icmp_type
     return None
 
-def capture(interface: str, pkt_queues: list[Queue[Packet]]): # * Note: capture takes a list of multiple packet queue's
+def capture(interface: str, pkt_queues: list[Queue[Packet]], stop_event): # * Note: capture takes a list of multiple packet queue's
                                                               #   to have seperate but identical queues for each type of   
                                                               #   scan in order to prevent race conditions from occuring.
-    sniff(
-        iface=interface,
-        filter="ip",
-        prn=lambda pkt: handle(pkt, pkt_queues),
-        store=0
-    )
+    while not stop_event.is_set():
+        sniff(
+            iface=interface,
+            filter="ip",
+            prn=lambda pkt: handle(pkt, pkt_queues),
+            store=0
+        )

@@ -8,6 +8,8 @@ from cli.cli import start_cli
                                                                             
 loopback = r'\Device\NPF_Loopback'
 wifi = "Wi-Fi"
+
+stop_event = threading.Event()
   
 def main():
     cli_packet_queue = queue.Queue()
@@ -17,14 +19,14 @@ def main():
     
     cli_thread = threading.Thread(
         target=start_cli,
-        args=(cli_packet_queue,),
+        args=(cli_packet_queue, stop_event),
         name="CLI",
         daemon=False
     )
 
     capture_thread = threading.Thread(
         target=capture,
-        args=(loopback, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue]),
+        args=(loopback, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue], stop_event),
         name="CAPTURE",
         daemon=False
     )
@@ -45,7 +47,7 @@ def main():
     
     sweep_thread = threading.Thread(
         target=detect_sweep,
-        args=(sweep_packet_queue, 5, 10, 300),
+        args=(sweep_packet_queue, 5, 10, 300, stop_event),
         name="SWEEP",
         daemon=False
     )
@@ -61,9 +63,8 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         print("Shutting down...")
-
-    print("Program terminating...")
-    
+        stop_event.set()
+        
     cli_thread.join()
     capture_thread.join()
     fast_scan_thread.join()

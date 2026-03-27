@@ -1,75 +1,112 @@
 from configurations.packet import Packet
 from utilities.block import block_ip, unblock_ip
 from utilities.gateway import get_gateway
-from logs.log import add_to_log, log_event
+from configurations.scan_types import flag_to_name
+from logs.log import add_to_log
 import time
 
-def detect_scan(packet_queue, interval, quantity, cooldown):
-    message = ""
-    gateway = get_gateway()
-    last_alert = {}
-    activity = {}
+class ScanDetector:
+    def __init__(self, packet_queue, interval, quantity, cooldown):
+        self.packet_queue = packet_queue
+        self.interval = interval          # seconds to track packets
+        self.quantity = quantity          # unique ports threshold
+        self.cooldown = cooldown          # cooldown before alerting same IP
+        self.gateway = get_gateway()
+        self.last_alert = {}              # src_ip -> last alert time
+        self.activity = {}                # src_ip -> list of (timestamp, dst_port, flags)
 
-    while True:
-        unblock_ip()
-        packet: Packet = packet_queue.get()
- 
+    def process_packet(self, packet: Packet):
+        """Process a single packet for scan detection."""
         now = packet.timestamp
         src_ip = packet.src_ip
         dst_port = packet.dst_port
         flags = packet.flags
         
-        log_event(f"Analyzing packet from {src_ip}...")
+        if not flags:
+            flags = "NONE"
 
         if not src_ip or not dst_port:
-            packet_queue.task_done()
-            continue
+            return
+
+        # Skip gateway and loopback
+        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("128."):
+            return
         
-        if not (flags and "SYN" in flags and "ACK" not in flags):
-            packet_queue.task_done()
-            continue
+        if packet.dst_port >= 1024:
+            return
 
-        if src_ip not in activity:
-            activity[src_ip] = []
-
-        activity[src_ip].append((now, dst_port, flags))
-
-        cutoff = now - interval
-        
-        activity[src_ip] = [(t, p, f) for (t, p, f) in activity[src_ip] if t >= cutoff]
-
-        unique_ports = {p for (_, p, _) in activity[src_ip]}
-        
-        total_packets = len(activity[src_ip])
-
-        if gateway is not None and packet.src_ip == gateway:
-            packet_queue.task_done()
-            continue
-        
-        elif packet.src_ip is not None and packet.src_ip.startswith("128."):
-            packet_queue.task_done()
-            continue
-        
-        elif len(unique_ports) >= quantity and total_packets >= quantity:
-            last = last_alert.get(src_ip, 0)
-
-            if now - last < cooldown:
-                packet_queue.task_done()
-                continue
-
-            last_alert[src_ip] = now
+        # Track activity
+        if src_ip not in self.activity:
+            self.activity[src_ip] = []
+            num_flags = self.filter_flags(dict(), flags)
+        else:
+            num_flags = self.filter_flags(self.activity[src_ip][0][2], flags)
             
-            message += f"\n{time.ctime()}\nPort Scan\n"
-            message += f"Source IP: {src_ip}\n"
-            message += "\n".join(
-                    f"{time.ctime(t)} | Port: {p} | Flags: {f}"
-                    for i, (t, p, f) in enumerate(activity[src_ip], start=1)
-                )
-            message += f"\nBlocking IP: {src_ip}\n"
-            message += "-" * 50
-            add_to_log(message, "detection_log.txt")
-            
-            #block_ip(src_ip)
-            activity[src_ip] = []
+        self.activity[src_ip].append((now, dst_port, num_flags))
 
-        packet_queue.task_done()
+        # Remove old packets outside interval
+        cutoff = now - self.interval
+        self.activity[src_ip] = [
+            (t, p, f) for (t, p, f) in self.activity[src_ip] if t >= cutoff
+        ]
+
+        # Check for scan
+        self.check_scan(src_ip, now)
+        
+    def filter_flags(self, num_flags: dict, flags: str):
+        if not flags:
+            return num_flags
+        elif flags not in num_flags:
+            num_flags[flags] = 1
+        else:
+            num_flags[flags] += 1
+            
+        return num_flags
+
+    def check_scan(self, src_ip, now):
+        """Check if a given IP has performed a port scan."""
+        unique_ports = {p for _, p, _ in self.activity[src_ip]}
+        num_flags: dict = self.activity[src_ip][0][2]
+
+        for flag, num in num_flags.items():
+            if num >= self.quantity and len(unique_ports) >= self.quantity:
+                last_time = self.last_alert.get(src_ip, 0)
+                if now - last_time < self.cooldown:
+                    return
+
+                self.last_alert[src_ip] = now
+                self.log_alert(src_ip, flag)
+
+                # Optionally block
+                # block_ip(src_ip)
+
+    def log_alert(self, src_ip, flag):
+        """Log all activity of the IP neatly, sorted by port."""
+        scan_type = flag_to_name[flag]
+        message = f"\n{time.ctime()}\n{scan_type}\nSource IP: {src_ip}\n"
+        sorted_activity = sorted(self.activity[src_ip], key=lambda x: x[1])  # sort by port
+
+        for t, p, f in sorted_activity:
+            message += f"{time.ctime(t)} | Port: {p} | Flags: {f}\n"
+
+        message += f"Blocking IP: {src_ip}\n" + "-"*50
+        add_to_log(message, "logs/detection_log.txt")
+
+        # Keep activity so future packets can still be tracked
+        # Remove only old packets outside interval
+        cutoff = time.time() - self.interval
+        self.activity[src_ip] = [
+            (t, p, f) for (t, p, f) in self.activity[src_ip] if t >= cutoff
+        ]
+
+def detect_scan(packet_queue, interval, quantity, cooldown):
+    """Thread entry point for scan detection."""
+    detector = ScanDetector(packet_queue, interval, quantity, cooldown)
+
+    while True:
+        unblock_ip()  # unblock IPs periodically
+        packet: Packet = packet_queue.get()
+        try:
+            detector.process_packet(packet)
+        finally:
+            packet_queue.task_done()

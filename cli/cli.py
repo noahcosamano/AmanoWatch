@@ -94,17 +94,15 @@ def parse_command(cmd: str):
 # -------------------------
 # CLI LOOP
 # -------------------------
-def start_cli(packet_queue: Queue):
+def start_cli(packet_queue: Queue, system_stop_event):
     
     stop_event = None
     worker_thread = None
 
-    while True:
+    while not system_stop_event.is_set():
         welcome()
-        log_event("Dashboard initialized. Waiting for user input...")
         cmd = input("NIDS> ")
         add_to_log(f"{cmd}\n", "logs/command_log.txt")
-        log_event(f"User Command: {cmd}")
 
         if cmd.lower() == "exit":
             print("Exiting CLI...")
