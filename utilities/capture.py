@@ -1,6 +1,6 @@
 from scapy.all import sniff
 from scapy.layers.inet import IP, TCP, UDP, ICMP
-from scapy.layers.l2 import Ether
+from scapy.layers.l2 import Ether, ARP
 from configurations.packet import Packet
 from queue import Queue
 from time import time
@@ -8,12 +8,28 @@ from configurations.proto_nums import protocol_nums
 from logs.log import log_event
 
 def handle(raw_pkt, packet_queues: list[Queue[Packet]]):
-    if IP not in raw_pkt:
-        return
-
     # MAC (safe)
     src_mac = raw_pkt[Ether].src if Ether in raw_pkt else None
     dst_mac = raw_pkt[Ether].dst if Ether in raw_pkt else None
+    
+    if ARP in raw_pkt:
+        src_ip = raw_pkt[ARP].psrc
+        dst_ip = raw_pkt[ARP].pdst
+        protocol = "ARP"
+
+        pkt = Packet(
+            dst_mac, src_mac, protocol,
+            None, src_ip, dst_ip,
+            None, None, None, time()
+        )
+
+        for queue in packet_queues:
+            queue.put(pkt)
+
+        return
+
+    if IP not in raw_pkt:
+        return
 
     # IP
     src_ip = raw_pkt[IP].src
@@ -75,7 +91,7 @@ def capture(interface: str, pkt_queues: list[Queue[Packet]], stop_event): # * No
     while not stop_event.is_set():
         sniff(
             iface=interface,
-            filter="ip",
+            filter="ip or arp",
             prn=lambda pkt: handle(pkt, pkt_queues),
             store=0
         )

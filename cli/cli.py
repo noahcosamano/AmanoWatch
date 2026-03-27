@@ -4,7 +4,7 @@ from cli.view_packets import view_proto, view_port
 from logs.log import add_to_log, log_event
 import os
 
-VALID_PROTOCOLS = {"TCP", "UDP", "ICMP", "IGMP", "ALL"}
+VALID_PROTOCOLS = {"TCP", "UDP", "ICMP", "ARP", "IGMP", "ALL"}
 
 
 # -------------------------
@@ -20,12 +20,22 @@ def error(msg: str):
 
 
 def welcome():
-    print("\n=== NIDS CLI ===")
-    print("Commands:")
-    print("  view [protocol | port] -wait=[milliseconds]")
-    print("    example: view tcp -wait=500")
-    print("    example: view 80 -wait=500")
-    print("  exit\n")
+    print("\n" + "="*40)
+    print("            NIDS CLI INTERFACE")
+    print("="*40)
+
+    print("\nAvailable Commands:\n")
+
+    print("  view [protocol | port] -wait=[ms]")
+    print("    • View filtered traffic in real time")
+    print("    • Examples:")
+    print("        view tcp -wait=500")
+    print("        view 80  -wait=500")
+
+    print("\n  exit")
+    print("    • Exit the program")
+
+    print("\n" + "="*40 + "\n")
 
 
 # -------------------------

@@ -5,7 +5,7 @@ from configurations.scan_types import flag_to_name
 from logs.log import add_to_log
 import time
 
-class ScanDetector:
+class PortScan:
     def __init__(self, packet_queue, interval, quantity, cooldown):
         self.packet_queue = packet_queue
         self.interval = interval          # seconds to track packets
@@ -32,7 +32,7 @@ class ScanDetector:
         if (self.gateway and src_ip == self.gateway) or src_ip.startswith("128."):
             return
         
-        if packet.dst_port >= 1024:
+        if dst_port >= 1024:
             return
 
         # Track activity
@@ -101,7 +101,7 @@ class ScanDetector:
 
 def detect_scan(packet_queue, interval, quantity, cooldown):
     """Thread entry point for scan detection."""
-    detector = ScanDetector(packet_queue, interval, quantity, cooldown)
+    detector = PortScan(packet_queue, interval, quantity, cooldown)
 
     while True:
         unblock_ip()  # unblock IPs periodically

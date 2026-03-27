@@ -1,0 +1,28 @@
+view tcp
+view tcp
+view all
+exit
+
+
+e
+view
+view udp
+view all
+view tcp
+eit
+exit
+exit
+arp
+view arp
+view arp
+
+ff
+view arp
+& "C:/Program Files/Python312/python.exe" c:/Users/ncosa/git-repos/ids/main.py
+view all
+ "C:/Program Files/Python312/python.exe" c:/Users/ncosa/git-repos/ids/main.py
+view arp
+view arp
+ "C:/Program Files/Python312/python.exe" c:/Users/ncosa/git-repos/ids/test/send_packets.py
+view arp
+view arp

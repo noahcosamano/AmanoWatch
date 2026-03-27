@@ -21,35 +21,35 @@ def main():
         target=start_cli,
         args=(cli_packet_queue, stop_event),
         name="CLI",
-        daemon=False
+        daemon=True
     )
 
     capture_thread = threading.Thread(
         target=capture,
-        args=(loopback, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue], stop_event),
+        args=(wifi, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue], stop_event),
         name="CAPTURE",
-        daemon=False
+        daemon=True
     )
 
     fast_scan_thread = threading.Thread(
         target=detect_scan,
         args=(fast_scan_packet_queue, 10, 20, 30),
         name="FAST-SCAN",
-        daemon=False
+        daemon=True
     )
     
     slow_scan_thread = threading.Thread(
         target=detect_scan,
         args=(slow_scan_packet_queue, 60, 50, 30),
         name="SLOW-SCAN",
-        daemon=False
+        daemon=True
     )
     
     sweep_thread = threading.Thread(
         target=detect_sweep,
         args=(sweep_packet_queue, 5, 10, 300, stop_event),
         name="SWEEP",
-        daemon=False
+        daemon=True
     )
 
     cli_thread.start()

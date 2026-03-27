@@ -22,7 +22,7 @@ class Packet:
 
         # IP layer
         if self.src_ip and self.dst_ip:
-            parts.append(f"{self.src_ip} → {self.dst_ip}")
+            parts.append(f"{self.src_ip} - {self.src_mac} → {self.dst_ip} - {self.dst_mac}")
 
         # Ports (for TCP/UDP)
         if self.src_port is not None and self.dst_port is not None:
