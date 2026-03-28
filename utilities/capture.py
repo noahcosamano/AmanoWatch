@@ -7,7 +7,7 @@ from configurations.packet import Packet
 from queue import Queue
 from time import time
 from configurations.proto_nums import protocol_nums
-from logs.log import log_event  
+from utilities.log import log_event  
 
 def handle(raw_pkt, packet_queues: list[Queue[Packet]]):
     try:

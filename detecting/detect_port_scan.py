@@ -2,7 +2,7 @@ from configurations.packet import Packet
 from utilities.block import block_ip, unblock_ip
 from utilities.gateway import get_gateway
 from configurations.scan_types import flag_to_name
-from logs.log import add_to_log, report_to_webhook
+from utilities.log import add_to_log, report_to_webhook
 import time
 
 class PortScan:

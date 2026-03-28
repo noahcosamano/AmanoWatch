@@ -1,7 +1,7 @@
 from queue import Queue
 import threading
 from cli.view_packets import view_proto, view_port
-from logs.log import add_to_log, log_event
+from utilities.log import add_to_log, log_event
 import os
 
 VALID_PROTOCOLS = {"TCP", "UDP", "ICMP", "ARP", "DNS", "IGMP", "ALL"}

@@ -1,6 +1,6 @@
 from configurations.packet import Packet
 from utilities.block import unblock_mac, block_mac
-from logs.log import add_to_log
+from utilities.log import add_to_log
 import time
 
 class ArpSpoof:
