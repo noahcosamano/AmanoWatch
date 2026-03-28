@@ -5,6 +5,7 @@ from utilities.capture import capture
 from detecting.detect_port_scan import detect_port_scan
 from detecting.detect_sweep import detect_sweep
 from detecting.detect_arp_spoof import detect_arp_spoof
+from detecting.detect_dns_tunnel import detect_dns_tunnel
 from cli.cli import start_cli
                                                                             
 loopback = r'\Device\NPF_Loopback'
@@ -18,6 +19,7 @@ def main():
     slow_scan_packet_queue = queue.Queue()
     arp_spoof_packet_queue = queue.Queue()
     sweep_packet_queue = queue.Queue()
+    dns_tunnel_packet_queue = queue.Queue()
     
     cli_thread = threading.Thread(
         target=start_cli,
@@ -29,7 +31,8 @@ def main():
     capture_thread = threading.Thread(
         target=capture,
         args=(
-            wifi, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, sweep_packet_queue, arp_spoof_packet_queue], stop_event
+            loopback, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, 
+            sweep_packet_queue, arp_spoof_packet_queue, dns_tunnel_packet_queue], stop_event
         ),
         name="CAPTURE",
         daemon=True
@@ -62,6 +65,13 @@ def main():
         name="ARP SPOOF",
         daemon=True
     )
+    
+    dns_tunnel_thread = threading.Thread(
+        target=detect_dns_tunnel,
+        args=(dns_tunnel_packet_queue, stop_event),
+        name="DNS TUNNEL",
+        daemon=True
+    )
 
     cli_thread.start()
     capture_thread.start()
@@ -69,6 +79,7 @@ def main():
     slow_scan_thread.start()
     sweep_thread.start()
     arp_spoof_thread.start()
+    dns_tunnel_thread.start()
     
     try:
         while cli_thread.is_alive():

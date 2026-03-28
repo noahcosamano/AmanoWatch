@@ -84,3 +84,70 @@ view dns
 view dns
 view dns
 view dns
+exit
+exit
+exit
+
+& "C:/Program Files/Python312/python.exe" c:/Users/ncosa/git-repos/ids/main.py
+view dns
+ss
+
+
+view tcp
+
+
+exit
+
+
+view dns
+view 53
+view dns
+view dns
+view dns
+view dns
+view dns
+view 53
+view dns
+
+view dns
+view dns
+view 53
+view dns
+view tcp
+view dns
+view 53
+view dns
+
+view arp
+view dns
+view tcp
+view 1
+view all
+
+view dns
+view icmp
+view dns
+view arp
+view tcp
+	view udp
+view dns
+view all
+'
+view dns
+view dns
+
+
+view dns
+view 53
+view 5353view 5353
+
+vuew 5353
+view dns
+view dns
+view dns
+view dns
+view dns
+view dns
+view dns
+ "C:/Program Files/Python312/python.exe" c:/Users/ncosa/git-repos/ids/test/send_packets.py
+view dns
