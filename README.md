@@ -1,3 +1,5 @@
+# **IMPORTANT:** Make Sure to run as administator ie. sudo as some features require admin
+
 # AmanoWatch 👁️
 ![Image Description](media/AmanoWatch.png)
 
