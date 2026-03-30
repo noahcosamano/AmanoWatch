@@ -1,6 +1,6 @@
 from configurations.packet import PyPacket
 from utilities.block import unblock_mac, block_mac
-from utilities.log import add_to_log
+from utilities.log import report_to_webhook
 import time
 
 class ArpSpoof:
@@ -32,7 +32,7 @@ class ArpSpoof:
         message += f"{ip} changed from {old_mac} to {new_mac}\n"
 
         message += f"Blocking {new_mac} for 300 seconds\n" + "-"*50
-        add_to_log(message, "logs/detection_log.txt")
+        report_to_webhook("ARP Spoof", message)
         
 def detect_arp_spoof(packet_queue, cooldown, stop_event):
     detector = ArpSpoof(packet_queue, cooldown)

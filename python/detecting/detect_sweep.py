@@ -62,7 +62,6 @@ def detect_sweep(packet_queue: Queue, interval, quantity, cooldown, stop_event):
                     for (t, d) in activity[src_ip]
                 )
             message += f"\nBlocking IP: {src_ip}\n"
-            add_to_log(message, "detection_log.txt")
     
             block_ip(src_ip)
             activity[src_ip] = []

@@ -1,0 +1,16 @@
+view all
+
+view dns
+
+view mdns
+
+
+
+view tcp
+
+view udp
+
+tcp
+
+view tcp
+

@@ -1,9 +1,22 @@
 import ctypes
 import os
+import sys
 from configurations.packet import PyPacket, Packet
 from configurations.proto_nums import protocol_nums
 from utilities.format_fields import format_flags, format_ip, format_mac
 from queue import Queue
+
+def get_dll_path():
+    # If running as a PyInstaller EXE
+    if getattr(sys, 'frozen', False):
+        # Look in the folder where the EXE is
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Look in the project root (dev mode)
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, "packet-capture.dll")
+
     
 def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
                         src_port, dst_port, query, timestamp):
@@ -14,13 +27,11 @@ def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
     return pkt
 
 def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
-    # 2. Load the DLL
-    # Make sure sniffer.dll is in the same folder as this script
-    dll_path = os.path.abspath("release/packet-capture.dll")
+    dll_path = get_dll_path()
     try:
         lib = ctypes.CDLL(dll_path)
     except OSError as e:
-        print(f"Error: Could not load DLL at {dll_path}. \n{e}")
+        print(f"CRITICAL: DLL not found at {dll_path}")
         return
 
     # 3. Define function signatures for the DLL exports

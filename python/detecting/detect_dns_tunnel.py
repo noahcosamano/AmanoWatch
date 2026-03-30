@@ -10,7 +10,8 @@ WHITELIST = {
     "windowsupdate.com", 
     "amazonaws.com", 
     "google.com", 
-    "akamai.net"
+    "akamai.net",
+    "sharepoint.com"
 }
 
 class DnsTunnel:

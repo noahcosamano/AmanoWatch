@@ -115,7 +115,7 @@ def start_cli(packet_queue: Queue, system_stop_event):
             cmd = input("NIDS> ")
             # Currently all commands are logged, I intend to get rid of this since 
             # normal detection logging has moved to discord.
-            add_to_log(f"{cmd}\n", "python/logs/command_log.txt")
+            add_to_log(f"{cmd}\n")
 
             if cmd.lower() == "exit":
                 stop_event.set()

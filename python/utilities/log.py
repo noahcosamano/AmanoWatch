@@ -1,12 +1,27 @@
 import threading
 import requests
-import time
+import os
+import sys
 
 WEBHOOK_URL = "https://discord.com/api/webhooks/1487319812026798140/6xQQHqux3fM2GoFXw9lWsSSce0ln5z2POw-1NW0s2dUrH9-tv0MhGZZXo2N5i51gWQ3F"
 
-def add_to_log(message, file_name):
-    with open(file_name, mode="a") as file:
-        file.writelines(message)
+if getattr(sys, 'frozen', False):
+    # If running as an EXE
+    base_path = os.path.dirname(sys.executable)
+else:
+    # If running as a normal script
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+# Create the full path
+log_dir = os.path.join(base_path, "logs")
+log_file = os.path.join(log_dir, "command_log.txt")
+
+def add_to_log(message):
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    with open(log_file, "a") as f:
+        f.write(message + "\n")
         
 def log_event(message):
     thread_name = threading.current_thread().name
