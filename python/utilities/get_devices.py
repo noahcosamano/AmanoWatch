@@ -1,25 +1,47 @@
-from utilities.load_dll import get_dll_path
-from utilities.ui_helpers import error
 import ctypes
+from load_dll import get_dll_path
+from ui_helpers import error
 
 def get_devices():
-    PCAP_ERRBUF_SIZE = 256 # Size of buffer in bytes
-    # This is the error buffer passed into GetDevices to capture error messages
+    PCAP_ERRBUF_SIZE = 256
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
-
+    
     dll_path = get_dll_path()
     try:
-        lib = ctypes.CDLL(dll_path, errbuf)
-    except OSError as e:
-        error(f"DLL not found at {dll_path}")
-        
+        lib = ctypes.CDLL(dll_path)
+    except OSError:
+        error(f"DLL NOT FOUND AT {dll_path}")
+        return
+
+    # 1. DEFINE ARGUMENTS AND RETURN TYPES CORRECTLY
+    # ASSUMING GetDevices RETURNS A char* (POINTER TO A STRING)
     lib.GetDevices.argtypes = [ctypes.c_char_p]
-    lib.InitCapture.restype = ctypes.c_char_p
+    lib.GetDevices.restype = ctypes.c_char_p 
 
-    devices = lib.GetDevices(errbuf)
+    # 2. CALL THE FUNCTION
+    devices_raw = lib.GetDevices(errbuf)
 
-    if not devices:
-        error(errbuf)
+    # 3. CHECK FOR ERRORS
+    if not devices_raw:
+        # CONVERT THE BYTES IN ERRBUF TO A PYTHON STRING
+        error_msg = errbuf.value.decode('utf-8', errors='ignore')
+        error(f"PCAP ERROR: {error_msg}")
         return
     
-    print(devices)
+    # 4. DECODE THE RESULT
+    # C RETURNS BYTES; WE NEED A STRING
+    devices_str = devices_raw.decode('utf-8', errors='ignore')
+    
+    print("\n" + "="*40)
+    print("AVAILABLE NETWORK DEVICES:")
+    print("="*40)
+    
+    # IF YOUR C CODE RETURNS A COMMA-SEPARATED LIST, SPLIT IT:
+    for i, dev in enumerate(devices_str.split('|'), 1):
+        if dev.strip():
+            print(f"{i}. {dev.strip()}")
+
+    print("="*40 + "\n")
+
+if __name__ == "__main__":
+    get_devices()
