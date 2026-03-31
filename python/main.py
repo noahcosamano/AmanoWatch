@@ -10,7 +10,8 @@ from cli.cli import start_cli
                             
 # standard adapters for debugging                                          
 loopback = b'\\Device\\NPF_Loopback'
-wifi = b"\\Device\\NPF_{194D9287-3B1B-4E06-B60E-5C6DE768B647}"
+pc_wifi = b"\\Device\\NPF_{194D9287-3B1B-4E06-B60E-5C6DE768B647}"
+wifi_laptop = b"\\Device\\NPF_{95DCD5E9-81B2-4BBB-BEC6-17C65D6ECD92}"
 
 # Ends all threads when ctrl+c is pressed for debugging
 stop_event = threading.Event()                 
@@ -36,7 +37,7 @@ def main():
     capture_thread = threading.Thread(
         target=capture,
         args=(
-            wifi, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, 
+            wifi_laptop, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, 
             sweep_packet_queue, arp_spoof_packet_queue, dns_tunnel_packet_queue], stop_event
         ),
         name="CAPTURE",
