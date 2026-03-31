@@ -148,3 +148,41 @@ protocol_nums = {
     206: "DNS",
     207: "MDNS"
 }
+
+# Layer 7 service ports
+service_ports = {
+    # Web & Security
+    80: "HTTP",
+    443: "HTTPS/TLS",
+    8080: "HTTP-Proxy",
+    
+    # Infrastructure & Discovery
+    53: "DNS",
+    67: "DHCP-Server",
+    68: "DHCP-Client",
+    123: "NTP",
+    161: "SNMP",
+    1900: "SSDP",  # Often appears as UDP/XML
+    5353: "mDNS",
+    
+    # File Transfer & Remote Access
+    20: "FTP-Data",
+    21: "FTP-Control",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    110: "POP3",
+    143: "IMAP",
+    445: "Microsoft-DS (SMB)",
+    3389: "RDP",
+    
+    # Database
+    1433: "MSSQL",
+    3306: "MySQL",
+    5432: "PostgreSQL",
+    
+    # Media & VoIP
+    5060: "SIP",
+    5061: "SIPS",
+    1935: "RTMP",
+}

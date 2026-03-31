@@ -2,7 +2,7 @@ import ctypes
 import os
 import sys
 from configurations.packet import PyPacket, Packet
-from configurations.proto_nums import protocol_nums
+from configurations.proto_nums import protocol_nums, service_ports
 from utilities.format_fields import format_flags, format_ip, format_mac
 from queue import Queue
 
@@ -17,6 +17,18 @@ def get_dll_path():
 
     return os.path.join(base_path, "packet-capture.dll")
 
+def get_protocol(protocol_num, src_port, dst_port):
+    protocol = protocol_nums[protocol_num]
+    if protocol == "TCP":
+        protocol = service_ports.get(dst_port, service_ports.get(src_port, "TCP"))
+    elif protocol == "UDP":
+        protocol = service_ports.get(dst_port, service_ports.get(src_port, "UDP"))
+    elif protocol == "ARP" or protocol == "DNS":
+        return protocol
+    else:
+        protocol = protocol_nums.get(protocol, "UNKNOWN")
+        
+    return protocol
     
 def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
                         src_port, dst_port, query, timestamp):
@@ -62,14 +74,11 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
                 flags = format_flags(CPacket.tcp_flags)
                 src_mac = format_mac(CPacket.src_mac)
                 dst_mac = format_mac(CPacket.dst_mac)
-                protocol = protocol_nums[CPacket.protocol]
+                protocol = get_protocol(CPacket.protocol, CPacket.src_port, CPacket.dst_port)
                 raw_payload = None
                 
-                # If you need to access the payload data:
                 if CPacket.payload_len > 0:
-                    # We MUST copy it immediately because the C buffer is transient
                     raw_payload = ctypes.string_at(CPacket.payload, CPacket.payload_len)
-                    # Process your payload bytes here (e.g., raw_payload.hex())
             
                 pypacket = convert_to_pypacket(protocol, CPacket.type, flags, src_mac, 
                                                dst_mac,src_ip, dst_ip, CPacket.src_port,

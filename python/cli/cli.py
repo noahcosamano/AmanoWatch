@@ -1,12 +1,8 @@
 from queue import Queue
 import threading
 from cli.view_packets import view_proto, view_port
-from utilities.log import add_to_log, log_event
+from configurations.proto_nums import protocol_nums
 import os
-
-# AmanoWatch currently supports these protocols
-VALID_PROTOCOLS = {"TCP", "UDP", "ICMP", "ARP", "DNS", "IGMP", "ALL"}
-
 
 # UI helpers
 def clear():
@@ -43,7 +39,7 @@ def validate_target(arg: str):
     """Validate protocol or port."""
     arg = arg.upper()
 
-    if arg in VALID_PROTOCOLS:
+    if arg in protocol_nums.values() or arg == "ALL":
         return arg
 
     if arg.isdigit():
@@ -113,9 +109,6 @@ def start_cli(packet_queue: Queue, system_stop_event):
         while not system_stop_event.is_set():
             welcome()
             cmd = input("NIDS> ")
-            # Currently all commands are logged, I intend to get rid of this since 
-            # normal detection logging has moved to discord.
-            add_to_log(f"{cmd}\n")
 
             if cmd.lower() == "exit":
                 stop_event.set()

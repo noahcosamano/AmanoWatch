@@ -15,17 +15,6 @@ else:
 # Create the full path
 log_dir = os.path.join(base_path, "logs")
 log_file = os.path.join(log_dir, "command_log.txt")
-
-def add_to_log(message):
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    with open(log_file, "a") as f:
-        f.write(message + "\n")
-        
-def log_event(message):
-    thread_name = threading.current_thread().name
-    print(f"[{thread_name}-THREAD] {message}")
     
 def report_to_webhook(detection_type, content):
     content_str = str(content)

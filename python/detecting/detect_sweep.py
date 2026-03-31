@@ -2,7 +2,6 @@ from configurations.packet import PyPacket
 from utilities.block import block_ip, unblock_ip
 from utilities.gateway import get_gateway
 from queue import Queue
-from utilities.log import add_to_log, log_event
 import time
 
 def detect_sweep(packet_queue: Queue, interval, quantity, cooldown, stop_event):
