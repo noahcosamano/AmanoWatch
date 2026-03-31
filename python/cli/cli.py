@@ -2,17 +2,7 @@ from queue import Queue
 import threading
 from cli.view_packets import view_proto, view_port
 from configurations.proto_nums import protocol_nums
-import os
-
-# UI helpers
-def clear():
-    os.system("cls")
-
-
-def error(msg: str):
-    clear()
-    print(f" Error: {msg}")
-
+from utilities.ui_helpers import clear, error
 
 def welcome():
     # I would like to make welcome message print better, looks sloppy at the moment

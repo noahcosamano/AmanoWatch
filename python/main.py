@@ -1,7 +1,7 @@
 import threading
 import queue
 import time
-from utilities.packet_capture import capture
+from utilities.capture import capture
 from detecting.detect_port_scan import detect_port_scan
 from detecting.detect_sweep import detect_sweep
 from detecting.detect_arp_spoof import detect_arp_spoof

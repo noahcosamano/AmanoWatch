@@ -1,21 +1,10 @@
 import ctypes
-import os
-import sys
 from configurations.packet import PyPacket, Packet
 from configurations.proto_nums import protocol_nums, service_ports
 from utilities.format_fields import format_flags, format_ip, format_mac
+from utilities.ui_helpers import error
+from utilities.load_dll import get_dll_path
 from queue import Queue
-
-def get_dll_path():
-    # If running as a PyInstaller EXE
-    if getattr(sys, 'frozen', False):
-        # Look in the folder where the EXE is
-        base_path = os.path.dirname(sys.executable)
-    else:
-        # Look in the project root (dev mode)
-        base_path = os.path.dirname(os.path.abspath(__file__))
-
-    return os.path.join(base_path, "packet-capture.dll")
 
 def get_protocol(protocol_num, src_port, dst_port):
     protocol = protocol_nums[protocol_num]
@@ -39,15 +28,18 @@ def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
     return pkt
 
 def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
+    PCAP_ERRBUF_SIZE = 256 # Size of buffer in bytes
+    # This is the error buffer passed into InitCapture in dll so python can see error messages
+    errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
+    
     dll_path = get_dll_path()
     try:
-        lib = ctypes.CDLL(dll_path)
+        lib = ctypes.CDLL(dll_path, errbuf)
     except OSError as e:
-        print(f"CRITICAL: DLL not found at {dll_path}")
+        error(f"DLL not found at {dll_path}")
         return
 
-    # 3. Define function signatures for the DLL exports
-    lib.InitCapture.argtypes = [ctypes.c_char_p]
+    lib.InitCapture.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     lib.InitCapture.restype = ctypes.c_int
     
     lib.GetNextPacket.argtypes = [ctypes.POINTER(Packet)]
@@ -56,19 +48,18 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
     lib.CloseCapture.argtypes = []
     lib.CloseCapture.restype = None
 
-    # 4. Initialize Capture
-    if not lib.InitCapture(device):
-        print("Failed to initialize capture. Check device path or Admin privileges.")
+    if not lib.InitCapture(device, errbuf):
+        error(errbuf)
         return
 
     CPacket = Packet()
 
     try:
         while not stop_event.is_set():
-            # 5. Pull the next packet from the C DLL
-            result = lib.GetNextPacket(ctypes.byref(CPacket))
+            # GetNextPacket called from capture.c in dll, return code stores as result
+            result = lib.GetNextPacket(ctypes.byref(CPacket)) 
             
-            if result == 1:
+            if result == 1: # Success, so fill packet
                 src_ip = format_ip(CPacket.src_ip, CPacket.is_ipv6)
                 dst_ip = format_ip(CPacket.dst_ip, CPacket.is_ipv6)
                 flags = format_flags(CPacket.tcp_flags)
@@ -77,8 +68,11 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
                 protocol = get_protocol(CPacket.protocol, CPacket.src_port, CPacket.dst_port)
                 raw_payload = None
                 
-                if CPacket.payload_len > 0:
-                    raw_payload = ctypes.string_at(CPacket.payload, CPacket.payload_len)
+                try:
+                    if CPacket.payload_len > 0:
+                        raw_payload = ctypes.string_at(CPacket.payload, CPacket.payload_len)
+                except Exception as e:
+                    error(f"Failed to read payload: {e}")
             
                 pypacket = convert_to_pypacket(protocol, CPacket.type, flags, src_mac, 
                                                dst_mac,src_ip, dst_ip, CPacket.src_port,
@@ -87,14 +81,13 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
                 for q in packet_queues:
                     q.put(pypacket)
 
-            elif result == 0:
-                # Timeout - just loop again
+            elif result == 0: # Failure, just continue looping
                 continue
-            else:
-                print("An error occurred in the capture handle.")
+            else: # Abnormal failure, tell the user and close capture
+                error(errbuf)
                 break
 
     except KeyboardInterrupt:
         print("\nStopping capture...")
     finally:
-        lib.CloseCapture()
+        lib.CloseCapture() # CloseCapture called from capture.c, closes capture handle created

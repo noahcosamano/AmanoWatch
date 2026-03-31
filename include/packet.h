@@ -17,7 +17,7 @@ typedef struct {
     uint16_t src_port;
     uint16_t dst_port;
     uint8_t protocol;
-    uint8_t type;
+    uint16_t type;
     uint8_t tcp_flags;
     
     long long tv_sec;
@@ -88,7 +88,7 @@ struct arp_header {
     uint16_t ptype;    // Protocol type (0x0800 for IPv4)
     uint8_t hlen;      // Hardware address length (6)
     uint8_t plen;      // Protocol address length (4)
-    uint8_t oper;     // Operation (1 for Request, 2 for Reply)
+    uint16_t oper;     // Operation (1 for Request, 2 for Reply)
     uint8_t src_mac[6];    // Sender hardware address
     uint8_t src_ip[4];    // Sender protocol address
     uint8_t dst_mac[6];    // Target hardware address
