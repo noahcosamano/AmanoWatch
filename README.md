@@ -1,6 +1,6 @@
 # **IMPORTANT:** Make Sure to run as administator ie. sudo as some features require admin
 
-# AmanoWatch 👁️
+# AmanoWatch 🦉
 ![Image Description](AmanoWatch/assets/amano-watch-logo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
