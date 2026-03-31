@@ -59,14 +59,14 @@ def begin_capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
                 raw_payload = None
                 
                 try:
-                    if CPacket.payload_len > 0:
-                        raw_payload = ctypes.string_at(CPacket.payload, CPacket.payload_len)
+                    if cpacket.payload_len > 0:
+                        raw_payload = ctypes.string_at(cpacket.payload, cpacket.payload_len)
                 except Exception as e:
                     error(f"Failed to read payload: {e}")
             
-                pypacket = convert_to_pypacket(protocol, CPacket.type, flags, src_mac, 
-                                               dst_mac,src_ip, dst_ip, CPacket.src_port,
-                                               CPacket.dst_port, raw_payload,CPacket.tv_sec)
+                pypacket = convert_to_pypacket(protocol, cpacket.type, flags, src_mac, 
+                                               dst_mac,src_ip, dst_ip, cpacket.src_port,
+                                               cpacket.dst_port, raw_payload, cpacket.tv_sec)
                 
                 for q in packet_queues:
                     q.put(pypacket)
