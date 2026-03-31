@@ -1,9 +1,9 @@
-import msvcrt
-import time
-import os
+from capture.config.config import udp_service_ports, tcp_service_ports
+from capture.classes.PyPacket import PyPacket
 from queue import Empty
-from configurations.packet import PyPacket
-from configurations.proto_nums import udp_service_ports, tcp_service_ports
+import msvcrt
+import os
+import time
 
 # Function called if a protocol is passed into "view"
 def view_proto(packet_queue, proto, stop_event, wait_ms: int):

@@ -1,12 +1,12 @@
+from cli.start import start_cli
+from capture.capture import begin_capture
+from detect.port_scan import detect_port_scan
+from detect.icmp_sweep import detect_sweep
+from detect.dns_tunnel import detect_dns_tunnel
+from detect.arp_spoof import detect_arp_spoof
 import threading
 import queue
 import time
-from utilities.capture import capture
-from detecting.detect_port_scan import detect_port_scan
-from detecting.detect_sweep import detect_sweep
-from detecting.detect_arp_spoof import detect_arp_spoof
-from detecting.detect_dns_tunnel import detect_dns_tunnel
-from cli.cli import start_cli
                             
 # standard adapters for debugging                                          
 loopback = b'\\Device\\NPF_Loopback'
@@ -35,7 +35,7 @@ def main():
 
     # All packet queues are passed in so each event has its own queue to prevent race conditions
     capture_thread = threading.Thread(
-        target=capture,
+        target=begin_capture,
         args=(
             wifi_laptop, [cli_packet_queue, fast_scan_packet_queue, slow_scan_packet_queue, 
             sweep_packet_queue, arp_spoof_packet_queue, dns_tunnel_packet_queue], stop_event

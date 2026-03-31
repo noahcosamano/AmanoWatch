@@ -1,4 +1,3 @@
-import threading
 import requests
 import os
 import sys

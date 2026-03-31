@@ -1,6 +1,5 @@
 import os
 
-# UI helpers
 def clear():
     os.system("cls")
 

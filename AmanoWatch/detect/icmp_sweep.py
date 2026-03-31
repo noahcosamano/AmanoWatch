@@ -1,6 +1,6 @@
-from configurations.packet import PyPacket
-from utilities.block import block_ip, unblock_ip
-from utilities.gateway import get_gateway
+from capture.classes import PyPacket
+from network.block_ip import block_ip, unblock_ip
+from network.get_gateway import get_gateway
 from queue import Queue
 import time
 

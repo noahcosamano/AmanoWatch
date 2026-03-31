@@ -1,35 +1,23 @@
-import ctypes
-from configurations.packet import PyPacket, Packet
-from configurations.proto_nums import protocol_nums, tcp_service_ports, udp_service_ports
-from utilities.format_fields import format_flags, format_ip, format_mac
-from utilities.ui_helpers import error
-from utilities.load_dll import get_dll_path
+from capture.classes.PyPacket import PyPacket
+from capture.classes.CPacket import CPacket
+from capture.parse.ip import format_ip
+from capture.parse.mac import format_mac
+from capture.parse.flags import format_flags
+from capture.parse.protocol import parse_protocol
+from utils.load_dll import get_dll_path
+from utils.ui_helpers import error
 from queue import Queue
+import ctypes
 
-def get_protocol(protocol_num, src_port, dst_port):
-    protocol = protocol_nums[protocol_num]
-    if protocol == "TCP":
-        protocol = tcp_service_ports.get(dst_port, tcp_service_ports.get(src_port, "TCP"))
-    elif protocol == "UDP":
-        protocol = udp_service_ports.get(dst_port, udp_service_ports.get(src_port, "UDP"))
-    elif protocol == "ARP":
-        return protocol
-    elif protocol == "ICMPV6":
-        return protocol
-    else:
-        protocol = protocol_nums.get(protocol, "UNKNOWN")
-        
-    return protocol
-    
 def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
                         src_port, dst_port, query, timestamp):
     
-    pkt = PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip, 
+    pypacket = PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip, 
                    src_port, dst_port, flags, query, timestamp)
     
-    return pkt
+    return pypacket
 
-def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
+def begin_capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
     PCAP_ERRBUF_SIZE = 256 # Size of buffer in bytes
     # This is the error buffer passed into InitCapture in dll so python can see error messages
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
@@ -44,7 +32,7 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
     lib.InitCapture.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     lib.InitCapture.restype = ctypes.c_int
     
-    lib.GetNextPacket.argtypes = [ctypes.POINTER(Packet)]
+    lib.GetNextPacket.argtypes = [ctypes.POINTER(CPacket)]
     lib.GetNextPacket.restype = ctypes.c_int
     
     lib.CloseCapture.argtypes = []
@@ -54,20 +42,20 @@ def capture(device, packet_queues: list[Queue[PyPacket]], stop_event):
         error(errbuf)
         return
 
-    CPacket = Packet()
+    cpacket = CPacket()
 
     try:
         while not stop_event.is_set():
             # GetNextPacket called from capture.c in dll, return code stores as result
-            result = lib.GetNextPacket(ctypes.byref(CPacket)) 
+            result = lib.GetNextPacket(ctypes.byref(cpacket)) 
             
             if result == 1: # Success, so fill packet
-                src_ip = format_ip(CPacket.src_ip, CPacket.is_ipv6)
-                dst_ip = format_ip(CPacket.dst_ip, CPacket.is_ipv6)
-                flags = format_flags(CPacket.tcp_flags)
-                src_mac = format_mac(CPacket.src_mac)
-                dst_mac = format_mac(CPacket.dst_mac)
-                protocol = get_protocol(CPacket.protocol, CPacket.src_port, CPacket.dst_port)
+                src_ip = format_ip(cpacket.src_ip, cpacket.is_ipv6)
+                dst_ip = format_ip(cpacket.dst_ip, cpacket.is_ipv6)
+                flags = format_flags(cpacket.tcp_flags)
+                src_mac = format_mac(cpacket.src_mac)
+                dst_mac = format_mac(cpacket.dst_mac)
+                protocol = parse_protocol(cpacket.protocol, cpacket.src_port, cpacket.dst_port)
                 raw_payload = None
                 
                 try:

@@ -1,6 +1,6 @@
 import ctypes
-from load_dll import get_dll_path
-from ui_helpers import error
+from utils.load_dll import get_dll_path
+from utils.ui_helpers import error
 
 def get_devices():
     PCAP_ERRBUF_SIZE = 256

@@ -1,25 +1,5 @@
 from dataclasses import dataclass
 from typing import Optional
-import ctypes
-
-class Packet(ctypes.Structure):
-    _pack_ = 1
-    _fields_ = [
-        ("src_mac", ctypes.c_uint8 * 6),
-        ("dst_mac", ctypes.c_uint8 * 6),
-        ("src_ip", ctypes.c_uint8 * 16),
-        ("dst_ip", ctypes.c_uint8 * 16),
-        ("is_ipv6", ctypes.c_uint8),
-        ("src_port", ctypes.c_uint16),
-        ("dst_port", ctypes.c_uint16),
-        ("protocol", ctypes.c_uint8),
-        ("type", ctypes.c_uint16),
-        ("tcp_flags", ctypes.c_uint8),
-        ("tv_sec", ctypes.c_longlong),
-        ("tv_usec", ctypes.c_longlong),
-        ("payload_len", ctypes.c_uint32),
-        ("payload", ctypes.POINTER(ctypes.c_uint8)),
-    ]
 
 @dataclass
 class PyPacket:

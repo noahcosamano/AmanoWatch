@@ -1,6 +1,6 @@
-from configurations.packet import PyPacket
-from utilities.block import unblock_mac, block_mac
-from utilities.log import report_to_webhook
+from capture.classes import PyPacket
+from network.block_mac import unblock_mac, block_mac
+from log.log import report_to_webhook
 import time
 
 class ArpSpoof:

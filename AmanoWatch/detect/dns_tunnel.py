@@ -1,5 +1,5 @@
-from configurations.packet import PyPacket
-from utilities.log import report_to_webhook
+from capture.classes import PyPacket
+from log.log import report_to_webhook
 import math
 from collections import Counter 
 import time

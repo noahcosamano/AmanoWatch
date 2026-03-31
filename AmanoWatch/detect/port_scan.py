@@ -1,8 +1,8 @@
-from configurations.packet import PyPacket
-from utilities.block import block_ip, unblock_ip
-from utilities.gateway import get_gateway
-from configurations.scan_types import flag_to_name
-from utilities.log import report_to_webhook
+from capture.classes import PyPacket
+from network.block_ip import block_ip, unblock_ip
+from network.get_gateway import get_gateway
+from detect.config import flag_to_name
+from log.log import report_to_webhook
 import time
 
 class PortScan:
