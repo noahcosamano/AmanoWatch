@@ -42,6 +42,9 @@ def view_proto(packet_queue, proto, stop_event, wait_ms: int):
             stop_event.set()
             clear()
             break
+        
+        if packet_queue.qsize() > 1000:
+            print(f"--- WARNING: Queue Backlog! ({packet_queue.qsize()} packets waiting) ---")
 
         try:
             packet = packet_queue.get(timeout=0.1)
@@ -77,6 +80,9 @@ def view_port(packet_queue, port, stop_event, wait_ms: int):
             stop_event.set()
             os.system("cls")
             break
+        
+        if packet_queue.qsize() > 1000:
+            print(f"--- WARNING: Queue Backlog! ({packet_queue.qsize()} packets waiting) ---")
 
         try:
             packet: PyPacket = packet_queue.get_nowait()
