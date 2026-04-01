@@ -184,7 +184,12 @@ EXPORT int InitCapture(const char* device_name, char* errbuf) { // Device name p
     // promiscuous mode: 1 enables promiscuous mode
     // to_ms: milliseconds until packet capture times out
     // errbuff: where error message is stored if handle fails to open
-    global_handle = pcap_open_live(device_name, 2 * 1024 * 1024, 1, 1000, errbuf);
+    global_handle = pcap_create(device_name, errbuf);
+    pcap_set_snaplen(global_handle, 65535);
+    pcap_set_promisc(global_handle, 1);
+    pcap_set_timeout(global_handle, 1000);
+    pcap_set_buffer_size(global_handle, 32 * 1024 * 1024); // 32MB buffer
+    pcap_activate(global_handle);
     // Checks if global_handle opened successfully
     if (global_handle) {
         global_link_type = pcap_datalink(global_handle); // Link-layer header type e.g. loopback, ethernet, etc.
