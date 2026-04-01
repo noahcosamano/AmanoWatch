@@ -4,3 +4,7 @@ logs/*.log
 .env
 old-capture/
 build/
+.vs/
+.release/
+.Debug/
+.x64/
