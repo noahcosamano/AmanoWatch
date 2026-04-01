@@ -2,6 +2,7 @@ from network.get_devices import get_devices
 from utils.ui_helpers import error, clear
 
 def select_device():
+    clear()
     devices: str = get_devices()
     device_indices = dict()
     
@@ -11,9 +12,14 @@ def select_device():
         return
     
     while True:
+        print("\n" + "="*40)
+        print("AVAILABLE NETWORK DEVICES:")
+        print("="*40)
         for index, device in enumerate(devices.strip("|").split("|"), start=1):
             device_indices[index] = device
             print(f"{index}.) {device}")
+        
+        print("="*40)
             
         try:
             selected = int(input("\nEnter a device number to capture on: "))
