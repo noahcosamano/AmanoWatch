@@ -20,7 +20,7 @@ stop_event = threading.Event()
 cli_ready_event = threading.Event()                 
   
 def main():
-    cli_packet_queue = queue.Queue()
+    cli_packet_queue = queue.Queue() 
     fast_scan_packet_queue = queue.Queue()
     slow_scan_packet_queue = queue.Queue()
     arp_spoof_packet_queue = queue.Queue()
