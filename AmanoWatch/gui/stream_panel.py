@@ -68,13 +68,13 @@ class PacketDetailDialog(QDialog):
         layout.addWidget(row("DST MAC",   getattr(pkt,'dst_mac', '—'), TEXT_DIM))
         layout.addWidget(h_sep())
         layout.addWidget(row("FLAGS",     getattr(pkt,'flags',   '—'), ORANGE))
-        layout.addWidget(row("ICMP TYPE", getattr(pkt,'type',    '—'), YELLOW))
+        layout.addWidget(row("TYPE", getattr(pkt,'type',    '—'), YELLOW))
 
         query = getattr(pkt, 'query', None)
         if query:
             try:    qstr = query.decode('utf-8', errors='replace')
             except: qstr = repr(query)
-            layout.addWidget(row("DNS QUERY", qstr, GREEN))
+            layout.addWidget(row("PAYLOAD", qstr, GREEN))
 
         layout.addStretch()
 

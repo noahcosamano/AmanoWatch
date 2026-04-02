@@ -30,7 +30,7 @@ except ImportError:
 
 
 # ── Demo packet generator (used when real capture is unavailable) ──────────────
-import random, math
+'''import random, math
 from collections import Counter
 
 _PROTOS    = ["TCP","UDP","ICMP","DNS","HTTP","HTTPS","ARP","TLS","DHCP","QUIC"]
@@ -83,7 +83,7 @@ def _demo_packet():
     )
     return pkt
 
-
+'''
 # ── Bridge ─────────────────────────────────────────────────────────────────────
 class CaptureBridge(QObject):
     """
@@ -124,7 +124,8 @@ class CaptureBridge(QObject):
         if REAL_CAPTURE and self.device_path:
             self._start_real()
         else:
-            self._start_demo()
+            #self._start_demo()
+            ...
         self._start_stats_timer()
 
     def stop(self):
@@ -147,7 +148,7 @@ class CaptureBridge(QObject):
             from capture.capture import begin_capture
             begin_capture(
                 self.device_path.encode(),
-                [cli_q, fast_q, slow_q, sweep_q, arp_q, dns_q],
+                [cli_q, fast_q, slow_q, arp_q],
                 self.stop_event, ready
             )
 
@@ -173,13 +174,13 @@ class CaptureBridge(QObject):
         def _dns():
             detect_dns_tunnel(dns_q, self.stop_event, ready, alert_callback=_emit_alert)
 
-        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _sweep, _arp, _dns]
+        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _arp]
         for fn in targets:
             t = threading.Thread(target=fn, daemon=True)
             t.start()
             self._threads.append(t)
 
-    # ── Demo capture ───────────────────────────────────────────────────────────
+    '''# ── Demo capture ───────────────────────────────────────────────────────────
     def _start_demo(self):
         def _demo_loop():
             while not self.stop_event.is_set():
@@ -223,7 +224,7 @@ class CaptureBridge(QObject):
         for fn in (_demo_loop, _demo_alerts):
             t = threading.Thread(target=fn, daemon=True)
             t.start()
-            self._threads.append(t)
+            self._threads.append(t)'''
 
     # ── Internal ───────────────────────────────────────────────────────────────
     def _on_packet(self, pkt):
