@@ -34,12 +34,27 @@ tcp_service_ports = {
     206: "DNS",
     207: "MDNS",
     208: "TLS",
+    210: "TELNET",
+    211: "FTP",
+    213: "NFS",
+    214: "SMTP",
+    215: "LDP",
+    218: "HTTP",
+    219: "HTTPS",
+    220: "POP3",
+    
+    
 }
 
 udp_service_ports = {
     206: "DNS",
     207: "MDNS",
     209: "QUIC",
+    212: "TFTP",
+    213: "NFS",
+    216: "SNMP",
+    217: "DHCP",
+    
 }
 
 """# Updated service ports (all uppercase)

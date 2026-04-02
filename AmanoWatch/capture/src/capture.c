@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "packet.h"
+#include "inspect.h"
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
@@ -30,6 +31,7 @@ void ProcessRawData(const struct pcap_pkthdr* header, const u_char* pkt_data, pa
     p->tv_usec = (long long)header->ts.tv_usec; // Microseconds
     p->payload = NULL;     // Explicitly nullify so error doesnt occur
     p->payload_len = 0;
+    p->app_protocol = 0;
 
     int offset = 0; // Tracks where program is in each header offset
     uint16_t eth_type = 0; // Initialize ethernet type
@@ -115,6 +117,17 @@ void ProcessRawData(const struct pcap_pkthdr* header, const u_char* pkt_data, pa
         p->payload = pkt_data + transport_offset + tcp_len; // If applicable, gets payload
         p->payload_len = (header->caplen > (uint32_t)(transport_offset + tcp_len)) ?
             header->caplen - (transport_offset + tcp_len) : 0;
+
+        if (IsTLS(p)) {}
+        else if (IsDNS(p)) {}
+        else if (IsTELNET(p)) {}
+        else if (IsFTP(p)) {}
+        else if (IsNFS(p)) {}
+        else if (IsSMTP(p)) {}
+        else if (IsLPD(p)) {}
+        else if (IsHTTP(p)) {}
+        else if (IsHTTPS(p)) {}
+        else if (IsPOP3(p)) {}
     }
     else if (p->protocol == 17) { // UDP
         // Gets UDP header
@@ -124,6 +137,13 @@ void ProcessRawData(const struct pcap_pkthdr* header, const u_char* pkt_data, pa
         p->payload = pkt_data + transport_offset + 8;
         p->payload_len = (header->caplen > (uint32_t)(transport_offset + 8)) ?
             header->caplen - (transport_offset + 8) : 0;
+
+        if (IsQUIC(p)) {}
+        else if (IsDNS(p)) {}
+        else if (IsTFTP(p)) {}
+        else if (IsNFS(p)) {}
+        else if (IsSNMP(p)) {}
+        else if (IsDHCP(p)) {}
     }
 }
 

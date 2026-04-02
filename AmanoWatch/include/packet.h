@@ -17,6 +17,7 @@ typedef struct {
     uint16_t src_port;
     uint16_t dst_port;
     uint8_t protocol;
+    uint8_t app_protocol;
     uint16_t type;
     uint8_t tcp_flags;
     
