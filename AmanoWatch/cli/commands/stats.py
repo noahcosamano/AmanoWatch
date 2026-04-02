@@ -9,7 +9,7 @@ def execute(stop_event):
     # This is the error buffer passed into InitCapture in dll so python can see error messages
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
     
-    dll_path = get_dll_path()
+    dll_path = get_dll_path("capture.dll")
     try:
         lib = ctypes.CDLL(dll_path, errbuf)
     except OSError as e:
