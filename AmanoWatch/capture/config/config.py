@@ -1,4 +1,8 @@
-# Updated protocol numbers (all uppercase)
+"""
+These are all of the default IEEE protocol numbers used to convert the uint8_t format protocol
+into the real human-readable protocol.
+"""
+
 protocol_nums = {
     0: "HOPOPT", 1: "ICMP", 2: "IGMP", 3: "GGP", 4: "IPV4", 5: "ST", 6: "TCP", 
     7: "CBT", 8: "EGP", 9: "IGP", 10: "BBN-RCC-MON", 11: "NVP-II", 12: "PUP", 
@@ -29,7 +33,14 @@ protocol_nums = {
     142: "ROHC", 143: "ETHERNET", 205: "ARP"
 }
 
-# Defined in inspect.h
+'''
+The dictionaries below are application layer protocols in which I have defined my own integer values to them
+for the ease of simplicity. In the inspect.h header file used in capture.c, all protocols are parsed and these
+custom integers are all assigned to the "app_protocol" field in the C packet. So a packet could have protocol
+set to 6 (TCP), but app_protocol could be set to 206 (DNS). This is to maintain original protocol while still
+having application layer stored.
+'''
+
 tcp_service_ports = {
     206: "DNS",
     207: "MDNS",
@@ -41,9 +52,7 @@ tcp_service_ports = {
     215: "LDP",
     218: "HTTP",
     219: "HTTPS",
-    220: "POP3",
-    
-    
+    220: "POP3",        
 }
 
 udp_service_ports = {
@@ -54,58 +63,4 @@ udp_service_ports = {
     213: "NFS",
     216: "SNMP",
     217: "DHCP",
-    
 }
-
-"""# Updated service ports (all uppercase)
-tcp_service_ports = {
-    20: "FTP-DATA",
-    21: "FTP-CONTROL",
-    22: "SSH",
-    23: "TELNET",
-    25: "SMTP",
-    80: "HTTP",
-    110: "POP3",
-    113: "IDENT",
-    119: "NNTP",
-    143: "IMAP",
-    179: "BGP",
-    389: "LDAP",
-    443: "HTTPS/TLS",
-    445: "MICROSOFT-DS (SMB)",
-    636: "LDAPS",
-    873: "RSYNC",
-    993: "IMAPS",
-    995: "POP3S",
-    1433: "MSSQL",
-    1723: "PPTP",
-    3306: "MYSQL",
-    3389: "RDP",
-    5432: "POSTGRESQL",
-    5900: "VNC",
-    8080: "HTTP-PROXY"
-}
-
-# UDP-SPECIFIC SERVICE PORTS
-udp_service_ports = {
-    53: "DNS",
-    67: "DHCP-SERVER",
-    68: "DHCP-CLIENT",
-    69: "TFTP",
-    123: "NTP",
-    161: "SNMP",
-    162: "SNMP-TRAP",
-    443: "QUIC",
-    500: "ISAKMP (VPN)",
-    514: "SYSLOG",
-    631: "IPP (PRINTING)",
-    1194: "OPENVPN",
-    1812: "RADIUS-AUTH",
-    1813: "RADIUS-ACCT",
-    1900: "SSDP",
-    3478: "STUN",
-    4500: "IPSEC-NAT-T",
-    5060: "SIP",
-    5353: "MDNS",
-    5683: "COAP"
-}"""

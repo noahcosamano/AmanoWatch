@@ -7,19 +7,29 @@ from detect.arp_spoof import detect_arp_spoof
 import threading
 import queue
 import time
-                            
-# standard adapters for debugging                                          
-loopback = b'\\Device\\NPF_Loopback'
-pc_wifi = b"\\Device\\NPF_{194D9287-3B1B-4E06-B60E-5C6DE768B647}"
-wifi_laptop = b"\\Device\\NPF_{95DCD5E9-81B2-4BBB-BEC6-17C65D6ECD92}"
 
+"""
+Author: Noah Cosamano
+
+Date: April 2, 2026
+
+This is the command line interface for AmanoWatch, I currently recommend using the CLI still as the GUI
+is still a heavy work-in-progress, many bugs (found and unfound) still exist, along with performance reduction.
+
+At the current moment in time, AmanoWatch has strong support for port scan detection and packet capturing. 
+ARP spoofing, DNS tunneling, and ICMP sweeping are still heavy works in progress and still need a lot of work.
+"""
+
+# Stores the device being used for capturing traffic, allows the user to select the device on startup.
+# I intend on adding a feature/command that allows device to be changed mid capture. This was done originally
+# and then scrapped due to unknown bugs, so this shared_content is still a remnant of that system.           
 shared_content = {}
 
-# Ends all threads when ctrl+c is pressed for debugging
-stop_event = threading.Event()
-cli_ready_event = threading.Event()                 
+stop_event = threading.Event() # Ends all threads when ctrl+c is pressed for debugging, or 'exit' in cli
+cli_ready_event = threading.Event() # Tells all other threads that the user has selected a device to capture on                 
   
 def main():
+    # All detectors and cli have their own packet queue to prevent race conditions and packet loss between queues
     cli_packet_queue = queue.Queue() 
     fast_scan_packet_queue = queue.Queue()
     slow_scan_packet_queue = queue.Queue()
@@ -28,7 +38,7 @@ def main():
     dns_tunnel_packet_queue = queue.Queue()
     
     # All threads are set to daemon=True to end when program ends
-    # all thread names are for debugging
+    # All thread names are for debugging
     cli_thread = threading.Thread(
         target=start_cli,
         args=(cli_packet_queue, stop_event, cli_ready_event, shared_content),
@@ -36,11 +46,10 @@ def main():
         daemon=True
     )
     
-    cli_thread.start()
-    cli_ready_event.wait()
-    device_path = shared_content["device_path"].encode("utf-8")
+    cli_thread.start() # CLI thread is started first so user can decide which device to capture on
+    cli_ready_event.wait() # Wait for the event to be set, this means user has selected device
+    device_path = shared_content["device_path"].encode("utf-8") # e.g. "\Device\NPF_Loopback"
 
-    # All packet queues are passed in so each event has its own queue to prevent race conditions
     capture_thread = threading.Thread(
         target=begin_capture,
         args=(
@@ -52,8 +61,8 @@ def main():
         name="CAPTURE",
         daemon=True
     )
-
-    fast_scan_thread = threading.Thread(
+    
+    fast_scan_thread = threading.Thread( # Detects fast port scan (20 hits in 10 seconds)
         target=detect_port_scan,
         # queue, interval, quantity, cooldown, stop event
         args=(fast_scan_packet_queue, 10, 20, 30, stop_event, cli_ready_event),
@@ -61,31 +70,37 @@ def main():
         daemon=True
     )
     
-    slow_scan_thread = threading.Thread(
+    # I intend on combining the two somehow
+    
+    slow_scan_thread = threading.Thread( # Detects slow port scan (50 hits in 60 seconds
         target=detect_port_scan,
-        # queue, interval, quantity, cooldown, stop event
+        # queue, interval, quantity, cooldown, stop event, cli ready event
         args=(slow_scan_packet_queue, 60, 50, 30, stop_event, cli_ready_event),
         name="SLOW-SCAN",
         daemon=True
     )
     
-    sweep_thread = threading.Thread(
+    sweep_thread = threading.Thread( # Sweep thread needs to be reprogrammed entirely,
+                                     # very deprecated compared to rest of program
         target=detect_sweep,
-        # queue, interval, quantity, cooldown, stop event
-        args=(sweep_packet_queue, 5, 10, 300, stop_event, cli_ready_event),
+        # queue, interval, quantity, cooldown, stop event, cli ready event
+        args=(sweep_packet_queue, 5, 10, 30, stop_event, cli_ready_event),
         name="SWEEP",
         daemon=True
     )
     
     arp_spoof_thread = threading.Thread(
-        target=detect_arp_spoof,
+        target=detect_arp_spoof, 
+        # queue, cooldown, stop event, cli ready event
         args=(arp_spoof_packet_queue, 30, stop_event, cli_ready_event),
         name="ARP SPOOF",
         daemon=True
     )
     
-    dns_tunnel_thread = threading.Thread(
+    dns_tunnel_thread = threading.Thread( # Many false positives right now, needs a lot of work
         target=detect_dns_tunnel,
+        # queue, stop event, cli ready event
+        # NOTE: No cooldown on dns tunnel since you'd probably want to see payload of each packet no matter how often
         args=(dns_tunnel_packet_queue, stop_event, cli_ready_event),
         name="DNS TUNNEL",
         daemon=True
@@ -102,7 +117,7 @@ def main():
     try:
         while cli_thread.is_alive():
             time.sleep(0.1) 
-    except KeyboardInterrupt:
+    except KeyboardInterrupt: # Shut down entire program when ctrl+c is pressed for debugging
         return
     finally:
         print("\nShutting down...")

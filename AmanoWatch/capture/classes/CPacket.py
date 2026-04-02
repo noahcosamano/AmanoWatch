@@ -1,5 +1,10 @@
 import ctypes
 
+"""
+This is the packet struct that was created and filled in C program. This is just so 
+the python program knows what the C struct looks like and can convert to PyPacket.
+"""
+
 class CPacket(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
