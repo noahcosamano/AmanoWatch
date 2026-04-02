@@ -48,6 +48,9 @@ class MainWindow(QMainWindow):
         root.addWidget(self._build_header())
         root.addWidget(h_sep())
 
+        self._demo_banner = self._build_demo_banner()
+        root.addWidget(self._demo_banner)
+
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
@@ -253,6 +256,26 @@ class MainWindow(QMainWindow):
 
         return bar
 
+    # ── Demo banner ───────────────────────────────────────────────────────────
+    def _build_demo_banner(self):
+        banner = QWidget()
+        banner.setStyleSheet(
+            f"background: rgba(255,140,0,0.12);"
+            f"border-bottom: 1px solid rgba(255,140,0,0.4);"
+        )
+        lay = QHBoxLayout(banner)
+        lay.setContentsMargins(14, 6, 14, 6)
+        icon = mono_label("⚠", size=12, color=ORANGE)
+        msg  = mono_label(
+            "DEMO MODE — No real capture running. "
+            "Go to Devices, select an adapter, then click SELECT DEVICE to start live capture.",
+            size=10, color=ORANGE)
+        msg.setWordWrap(False)
+        lay.addWidget(icon)
+        lay.addSpacing(6)
+        lay.addWidget(msg, 1)
+        return banner
+
     # ─────────────────────────────────────────────────────────────────────────
     # Bridge wiring
     # ─────────────────────────────────────────────────────────────────────────
@@ -265,9 +288,11 @@ class MainWindow(QMainWindow):
 
         from gui.bridge import REAL_CAPTURE
         if REAL_CAPTURE:
+            self._demo_banner.hide()
             self._mode_lbl.setText("LIVE CAPTURE")
             self._mode_lbl.setStyleSheet(f"color:{GREEN}; background:transparent;")
         else:
+            self._demo_banner.show()
             self._status_lbl.setText(
                 "Running in DEMO mode — go to Devices tab to connect real capture")
 
@@ -292,7 +317,9 @@ class MainWindow(QMainWindow):
         self._device_name = name
         self._device_lbl.setText(f"⬡  {name}")
         self._status_lbl.setText(f"Capturing on: {name}")
-        self._bridge.stop()
+        self._demo_banner.hide()
+        self._mode_lbl.setText("LIVE CAPTURE")
+        self._mode_lbl.setStyleSheet(f"color:{GREEN}; background:transparent;")
         self._bridge.device_path = path
         self._bridge.start()
         self._switch_tab("stream")

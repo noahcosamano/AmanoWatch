@@ -115,7 +115,12 @@ class CaptureBridge(QObject):
 
     # ── Public API ─────────────────────────────────────────────────────────────
     def start(self):
+        self.stop()
         self.stop_event.clear()
+        with self._lock:
+            self._pkt_count = 0
+            self._drop_count = 0
+            self._proto_counts = {}
         if REAL_CAPTURE and self.device_path:
             self._start_real()
         else:
@@ -124,6 +129,9 @@ class CaptureBridge(QObject):
 
     def stop(self):
         self.stop_event.set()
+        for t in self._threads:
+            t.join(timeout=1.0)
+        self._threads.clear()
 
     # ── Real capture ───────────────────────────────────────────────────────────
     def _start_real(self):
@@ -162,7 +170,7 @@ class CaptureBridge(QObject):
         def _dns():
             detect_dns_tunnel(dns_q, self.stop_event, ready)
 
-        targets = [_capture, _drain, _fast_scan, _slow_scan, _sweep, _arp, _dns]
+        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _sweep, _arp, _dns]
         for fn in targets:
             t = threading.Thread(target=fn, daemon=True)
             t.start()
