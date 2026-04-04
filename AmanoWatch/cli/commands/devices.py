@@ -4,16 +4,17 @@ import msvcrt
 
 def execute(stop_event):
     clear()
+    # Fetch all devices to be printed to user
     devices = get_devices()
     
-    if not devices:
+    if not devices: # Almost always due to error in fetching dll
         error("Could not find any devices")
     
     print("\n" + "="*40)
     print("AVAILABLE NETWORK DEVICES:")
     print("="*40)
     
-    # IF YOUR C CODE RETURNS A COMMA-SEPARATED LIST, SPLIT IT:
+    # Devices are returned with '|' seperating each in get_devices
     for i, dev in enumerate(devices.split('|'), 1):
         if dev.strip():
             print(f"{i}. {dev.strip()}")
