@@ -19,6 +19,7 @@ class PyPacket:
     dst_port: Optional[int]    # Used in synergy with src_ip to track traffic frequency
     flags: Optional[str]       # Used to detect different types of TCP scans (ie. SYN, XMAS, NULL, etc.)
     query: Optional[bytes]     # Used to detect DNS tunneling via string entropy
+    query_len: Optional[int]
     timestamp: float           # For logging or tracking traffic frequency
      
     def __str__(self): # For printing packets to the terminal when using CLI version of the program

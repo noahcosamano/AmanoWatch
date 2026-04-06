@@ -12,10 +12,10 @@ import ctypes
 # I don't think this function is necessary, in the future I intend on scrapping PyPackets entirely
 # because it's a lot of overhead time for the system
 def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
-                        src_port, dst_port, query, timestamp):
+                        src_port, dst_port, query, query_len, timestamp):
     
     pypacket = PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip, 
-                   src_port, dst_port, flags, query, timestamp)
+                   src_port, dst_port, flags, query, query_len, timestamp)
     
     return pypacket
 
@@ -24,7 +24,7 @@ def queue(arp_queue, dns_queue, fast_scan_queue, slow_scan_queue, icmp_queue, cl
     
     if packet.protocol == "ARP":
         arp_queue.put(packet)
-    elif packet.protocol in ("DNS", "MDNS"):
+    elif packet.protocol == "DNS":
         dns_queue.put(packet)
     elif packet.protocol in ("TCP", "UDP"):
         fast_scan_queue.put(packet)
@@ -82,10 +82,13 @@ def begin_capture(device, arp_queue, dns_queue, fast_scan_queue,
                     src_mac = format_mac(cpacket.src_mac)
                     dst_mac = format_mac(cpacket.dst_mac)
                     raw_payload = None
+                    payload_len = None
                     
                     try:
                         if cpacket.payload_len > 0:
                             raw_payload = ctypes.string_at(cpacket.payload, cpacket.payload_len)
+                            payload_len = cpacket.payload_len
+                            
                     except Exception as e:
                         error(f"Failed to read payload: {e}")
                     
@@ -94,7 +97,7 @@ def begin_capture(device, arp_queue, dns_queue, fast_scan_queue,
                 
                     pypacket = convert_to_pypacket(protocol, cpacket.type, flags, src_mac, 
                                                 dst_mac,src_ip, dst_ip, cpacket.src_port,
-                                                cpacket.dst_port, raw_payload, cpacket.tv_sec)
+                                                cpacket.dst_port, raw_payload, payload_len, cpacket.tv_sec)
                 
                     queue(arp_queue, dns_queue, fast_scan_queue, slow_scan_queue, icmp_queue, cli_queue, pypacket)
 

@@ -88,20 +88,20 @@ def send_packet(protocol, dst_ip, src_ip=None, src_port=None, dst_port=None,
     
 def main():
     protocol = "DNS"
-    dst_ip = "127.0.0.1"
+    dst_ip = "137.238.221.54"
     src_ip = "192.168.1.2"
     src_port = 12345
     dst_port = 53
     src_mac = "56:1A:7D:3F:4B:6C"
     dst_mac = "41:1A:7D:3F:4B:6C"
     flags = None
-    payload = "dGhpcyBpcyBhbiBpbnRydWRlciBleGZpbHRyYXRpbmcgZGF0YSBpIHRoaW5rIHRoZSBwYXNzd29yZCBpcyBwYXNzd29yZCBhbmQgaWRrIHdoYXQgdGhlIG5hbWUgaXM=".encode("utf-8")
+    payload = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6".encode()
     num_packets = 1
     
     send_packet(protocol, dst_ip, src_ip, src_port, dst_port, src_mac, dst_mac, flags, payload, num_packets)
     
-    '''for port in range(40):
-        send_packet(protocol, dst_ip, src_ip, src_port, port, src_mac, dst_mac, flags, num_packets)
-        pass'''
+    for port in range(20):
+        send_packet(protocol, dst_ip, src_ip, src_port, dst_port, src_mac, dst_mac, flags, payload, num_packets)
+        pass
 
 main()

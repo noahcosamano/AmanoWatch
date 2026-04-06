@@ -121,7 +121,7 @@ class CaptureBridge(QObject):
         def _dns():
             detect_dns_tunnel(dns_q, self.stop_event, ready, alert_callback=_emit_alert)
 
-        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _arp]
+        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _arp, _dns]
         for fn in targets:
             t = threading.Thread(target=fn, daemon=True)
             t.start()
