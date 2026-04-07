@@ -5,6 +5,7 @@ from detect.icmp_sweep import detect_sweep
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.arp_spoof import detect_arp_spoof
 from detect.honey_ports import detect_honey_port_connection
+from database.init_db import init_db
 import threading
 import queue
 import time
@@ -30,6 +31,7 @@ stop_event = threading.Event() # Ends all threads when ctrl+c is pressed for deb
 cli_ready_event = threading.Event() # Tells all other threads that the user has selected a device to capture on                 
   
 def main():
+    init_db()
     # All detectors and cli have their own packet queue to prevent race conditions and packet loss between queues
     cli_queue = queue.Queue() 
     slow_scan_queue = queue.Queue()

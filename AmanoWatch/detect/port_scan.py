@@ -4,7 +4,10 @@ from network.get_gateway import get_gateway
 from network.get_ip import get_ip
 from detect.config import FLAG_TO_NAME
 from log.log import report_to_webhook
+from database.add_detection import add_detection
 import time
+import traceback
+
 
 class PortScan:
     def __init__(self, device, packet_queue, interval, quantity, cooldown, alert_callback=None):
@@ -13,14 +16,17 @@ class PortScan:
         self.quantity = quantity
         self.cooldown = cooldown
         self.gateway = get_gateway()
-        self.host_ip = get_ip(device).replace("(Preferred)","").strip()
-        self.last_alert = {}   # src_ip -> {flag: last_alert_time}
-        self.activity = {}     # src_ip -> list of (timestamp, dst_port)
-        self.num_flags = {}    # src_ip -> {flag: count}
+        self.host_ip = get_ip(device)
+        self.last_alert = {}    # src_ip -> {scan_type: last_alert_time}
+        self.activity = {}      # src_ip -> list of (timestamp, port, scan_type)
+        self.scan_counts = {}   # src_ip -> {scan_type: count}
         self.alert_callback = alert_callback
 
+        if self.host_ip:
+            self.host_ip = self.host_ip.replace("(Preferred)", "").strip()
+
     def process_packet(self, packet: PyPacket):
-        now = packet.timestamp 
+        now = packet.timestamp
         src_ip = packet.src_ip
         dst_port = packet.dst_port
         flags = packet.flags or "NONE"
@@ -28,73 +34,108 @@ class PortScan:
         if not src_ip or not dst_port:
             return
 
-        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("127."):
+        # NOTE: "128." is a temporary loopback-testing hack — change back to "127."
+        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("128."):
             return
 
-        if dst_port >= 1024:
-            return
-        
+        # Ignore our own outbound traffic so replies don't get counted as scans
         if self.host_ip and self.host_ip == src_ip:
-            ...
+            return
 
+        # Only count packets whose flag combination matches a known scan type.
+        # FLAG_TO_NAME contains exactly the probe combinations we care about
+        # (SYN, FIN, FIN PSH URG, etc.) — anything else (RST ACK, PSH ACK,
+        # SYN ACK, etc.) is reply/normal traffic and gets dropped here.
+        scan_type = FLAG_TO_NAME.get(flags)
+        if scan_type is None:
+            return
+
+        # Initialize per-source tracking on first sighting
         if src_ip not in self.activity:
-            self.activity[src_ip]   = []
-            self.num_flags[src_ip]  = {}
-            self.last_alert[src_ip] = {}
+            self.activity[src_ip]    = []
+            self.scan_counts[src_ip] = {}
+            self.last_alert[src_ip]  = {}
 
-        self.num_flags[src_ip][flags] = self.num_flags[src_ip].get(flags, 0) + 1
-        self.activity[src_ip].append((now, dst_port))
+        self.scan_counts[src_ip][scan_type] = self.scan_counts[src_ip].get(scan_type, 0) + 1
+        self.activity[src_ip].append((now, dst_port, scan_type))
 
+        # Slide the window
         cutoff = now - self.interval
-        self.activity[src_ip] = [(t, p) for t, p in self.activity[src_ip] if t >= cutoff]
+        self.activity[src_ip] = [(t, p, s) for t, p, s in self.activity[src_ip] if t >= cutoff]
 
-        self.check_scan(src_ip, now)
+        self.check_scan(packet, now)
 
-    def check_scan(self, src_ip, now):
-        unique_ports = {p for _, p in self.activity[src_ip]}
-        counts = self.num_flags.get(src_ip, {})
+    def check_scan(self, packet: PyPacket, now):
+        src_ip = packet.src_ip
+        counts = self.scan_counts.get(src_ip, {})
 
-        for flag, num in list(counts.items()):
+        for scan_type, num in list(counts.items()):
+            # Count unique ports hit by THIS scan type only — prevents a SYN
+            # flood from inflating the port count that ACK scan detection sees,
+            # which was causing duplicate alerts on a single nmap run.
+            unique_ports = {p for _, p, s in self.activity[src_ip] if s == scan_type}
+
             if num < self.quantity or len(unique_ports) < self.quantity:
                 continue
 
-            last_time = self.last_alert[src_ip].get(flag, 0)
+            last_time = self.last_alert[src_ip].get(scan_type, 0)
             if now - last_time < self.cooldown:
                 continue
 
-            # Record alert time for this specific flag
-            self.last_alert[src_ip][flag] = now
+            self.last_alert[src_ip][scan_type] = now
 
-            # Clear ALL flag counts — packets seen during one scan type
-            # will have inflated counts for every other type too, so leaving
-            # them causes cascade false positives on the very next packet.
-            # Per-flag cooldowns above ensure each type can still re-detect
-            # independently once the cooldown expires.
-            self.num_flags[src_ip].clear()
+            # Clear ALL scan counts. Probes from one scan type can inflate
+            # counts for others; per-type cooldowns above let each scan
+            # re-detect independently.
+            self.scan_counts[src_ip].clear()
 
-            self.log_alert(src_ip, flag)
-            return  # one alert per packet is enough; recheck next packet
+            self.log_alert(packet, scan_type)
+            return  # one alert per packet
 
-    def log_alert(self, src_ip, flag):
-        scan_type = FLAG_TO_NAME.get(flag, flag)
-        message = f"\n{time.ctime()}\n{scan_type}\nSource IP: {src_ip}\n"
+    def log_alert(self, packet: PyPacket, scan_type: str):
+        src_ip = packet.src_ip
 
-        for t, p in sorted(self.activity[src_ip], key=lambda x: x[1]):
-            message += f"{time.ctime(t)} | Port: {p}\n"
+        # Only show packets that belong to THIS scan type in the details
+        type_packets = [(t, p) for t, p, s in self.activity[src_ip] if s == scan_type]
 
-        message += f"Blocking {src_ip} for 300 seconds\n"
-        report_to_webhook(scan_type, message)
+        all_packets = ""
+        for t, p in sorted(type_packets, key=lambda x: x[1]):
+            all_packets += f"{time.ctime(t)} | Port: {p}\n"
 
+        unique_ports = len({p for _, p in type_packets})
+        summary = f"{src_ip} performed {scan_type} across {unique_ports}+ ports in {self.interval}s"
+        details = f"Scan type: {scan_type}\nUnique ports: {unique_ports}\nPackets:\n{all_packets}"
+
+        # Persist to database
+        add_detection(
+            timestamp=packet.timestamp,
+            detector_type=scan_type,
+            severity="WARNING",
+            summary=summary,
+            src_ip=src_ip,
+            src_mac=packet.src_mac,
+            src_port=packet.src_port,
+            dst_ip=packet.dst_ip,
+            dst_mac=packet.dst_mac,
+            dst_port=packet.dst_port,
+            details=details,
+        )
+
+        # Webhook
+        webhook_message = f"\n{time.ctime()}\n{scan_type}\nSource IP: {src_ip}\n{all_packets}"
+        report_to_webhook(scan_type, webhook_message)
+
+        # GUI alert last
         if self.alert_callback:
-            unique_ports = len({p for _, p in self.activity.get(src_ip, [])})
             self.alert_callback(
                 "warning",
-                scan_type.upper() if scan_type else "unknown scan",
+                scan_type.upper(),
                 f"{scan_type} across {unique_ports} ports from {src_ip}"
             )
 
+        # Trim window
         cutoff = time.time() - self.interval
-        self.activity[src_ip] = [(t, p) for t, p in self.activity[src_ip] if t >= cutoff]
+        self.activity[src_ip] = [(t, p, s) for t, p, s in self.activity[src_ip] if t >= cutoff]
 
 
 def detect_port_scan(device, packet_queue, interval, quantity, cooldown, stop_event, cli_ready, alert_callback=None):
@@ -105,5 +146,8 @@ def detect_port_scan(device, packet_queue, interval, quantity, cooldown, stop_ev
         packet: PyPacket = packet_queue.get()
         try:
             detector.process_packet(packet)
+        except Exception as e:
+            print(f"[ERROR] port_scan: {e!r}")
+            traceback.print_exc()
         finally:
             packet_queue.task_done()

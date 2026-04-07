@@ -1,6 +1,7 @@
 from detect.config import HONEY_PORTS
 from capture.classes.PyPacket import PyPacket
 from log.log import report_to_webhook
+from database.add_detection import add_detection
 from network.block_ip import block_ip, unblock_ip
 from network.get_gateway import get_gateway
 from network.get_ip import get_ip
@@ -11,17 +12,16 @@ class HoneyPort:
         self.packet_queue = packet_queue
         self.alert_callback = alert_callback
         self.gateway = get_gateway()
-        self.host_ip = get_ip(device).replace("(Preferred)","").strip()
-    
-        print(f"Device: {device} | Host IP: {self.host_ip}")
+        self.host_ip = get_ip(device)
+        
+        if self.host_ip:
+            self.host_ip = self.host_ip.replace("(Preferred)","").strip()
         
     def _process_packet(self, packet: PyPacket):
         now = packet.timestamp
         dst_port = packet.dst_port
         src_ip = packet.src_ip
         dst_ip = packet.dst_ip
-        
-        #print(f"Time: {now} | Port: {dst_port} | IP: {src_ip}")
         
         if not src_ip or not dst_port or not dst_ip:
             return
@@ -35,7 +35,7 @@ class HoneyPort:
         protocol, reason = self.check_port(dst_port)
         
         if protocol and reason:
-            self.detect(now, src_ip, dst_port, protocol, reason)
+            self.detect(packet, protocol, reason)
         
     def check_port(self, dst_port):
         if dst_port in HONEY_PORTS.keys():
@@ -48,23 +48,21 @@ class HoneyPort:
         
         return None, None
     
-    def detect(self, timestamp, src_ip, dst_port, protocol, reason):
-        #block_ip(src_ip)
-        country = search_ip(src_ip) or "Unknown"
-        message = f"\n{timestamp}\nHoneyport Traffic\nSource IP: {src_ip} ({country})\n"
-        message += f"Traffic on port {dst_port} detected.\n"
-        message += f"{dst_port} is usually used for {protocol}.\n"
-        message += f"Reason for detection: {reason}\n"
-        message += f"Blocking {src_ip} for 300 seconds"
-        report_to_webhook("Honeyport Traffic", message)
+    def detect(self, packet: PyPacket, protocol, reason):
+        country = search_ip(packet.src_ip) or "Unknown"
         
         if self.alert_callback:
             self.alert_callback(
                 "info",
                 "Honeyport Connection Established",
-                f"{src_ip} (origin: {country}) connected to port {dst_port}\nport {dst_port} is generally used for {protocol}" \
+                f"{packet.src_ip} (origin: {country}) connected to port {packet.dst_port}\nport {packet.dst_port} is generally used for {protocol}" \
                     f"\nReason for alert: {reason}"
             )
+            
+        summary = f"{packet.src_ip} connected to port {packet.dst_port}"
+        details = f"Origin: {country}, Port Protocol: {protocol}, Reason for Flag: {reason}"
+        add_detection(packet.timestamp, "Honey Port", "INFO", summary, packet.src_ip, packet.src_mac,
+                      packet.src_port, packet.dst_ip, packet.dst_mac, packet.dst_port, details)
         
 def detect_honey_port_connection(device_name, packet_queue, stop_event, cli_ready, alert_callback=None):
     detector = HoneyPort(device_name, packet_queue, alert_callback=alert_callback)

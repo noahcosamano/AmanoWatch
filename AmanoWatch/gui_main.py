@@ -10,8 +10,10 @@ import queue
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from gui.main_window import MainWindow
+from database.init_db import init_db
 
 def main():
+    init_db()
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 

@@ -1,9 +1,9 @@
 from capture.classes.PyPacket import PyPacket
 from log.log import report_to_webhook
 from detect.config import DNS_WHITELIST
+from database.add_detection import add_detection
 import math
 from collections import Counter 
-import time
 
 class DnsTunnel:
     def __init__(self, packet_queue, alert_callback=None):
@@ -41,11 +41,11 @@ class DnsTunnel:
         self.risk += (subdomain_len * 0.01)
         
         if (5.0 <= self.risk < 5.5):
-            self.detect_tunnel(packet, domain, "MEDIUM")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "MEDIUM")
         elif (5.5 <= self.risk < 6.0):
-            self.detect_tunnel(packet, domain, "HIGH")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "HIGH")
         elif (6.0 <= self.risk):
-            self.detect_tunnel(packet, domain, "CRITICAL")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "CRITICAL")
             
         self.risk = 0
         
@@ -85,18 +85,17 @@ class DnsTunnel:
         except Exception:
             return ""
         
-    def detect_tunnel(self, packet, domain_name, severity):
-        message = (
-                f"\n{time.ctime()}\nDNS Tunnel Detected\n"
-                f"Severity: {severity}\n"
-                f"Source IP: {packet.src_ip}\n"
-                f"Domain: {domain_name}\n"
-                f"Blocking {packet.src_ip} for 300 seconds\n"
-            )
-        report_to_webhook("DNS Tunnel", message)
+    def detect_tunnel(self, packet: PyPacket, domain_name, domain_length, 
+                      domain_entropy, risk_score, severity):
+        
         if self.alert_callback:
             self.alert_callback(severity, "DNS TUNNELING", f"High-entropy domain from {packet.src_ip}: \
                                 {domain_name}")
+
+        summary = f"{packet.src_ip} sent malicious domain, possible data exfiltration."
+        details = f"Domain: {domain_name}, domain length: {domain_length}, domain entropy: {domain_entropy}, risk score: {risk_score}"
+        add_detection(packet.timestamp, "DNS Tunnel", severity, summary, packet.src_ip, packet.src_mac,
+                      packet.src_port, packet.dst_ip, packet.dst_mac, packet.dst_port, details)
     
 def detect_dns_tunnel(packet_queue, stop_event, cli_ready, alert_callback=None):
     detector = DnsTunnel(packet_queue, alert_callback=alert_callback)
