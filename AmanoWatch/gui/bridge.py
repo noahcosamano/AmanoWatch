@@ -3,7 +3,8 @@ AmanoWatch GUI — Capture Bridge
 Runs the real capture + detection threads and emits Qt signals
 so the GUI can update safely from the main thread.
 
-Drop-in: just instantiate CaptureBridge, connect signals, call start().
+Each detector has its own stop event so it can be individually
+disabled/enabled at runtime without touching the capture thread.
 """
 
 import threading
@@ -11,23 +12,16 @@ import queue
 import time
 from PyQt6.QtCore import QObject, pyqtSignal
 
-# ── Try to import real AmanoWatch modules ──────────────────────────────────────
-# If they're not on sys.path yet, the bridge runs in DEMO mode with fake packets.
-try:
-    from capture.capture import begin_capture
-    from capture.classes.PyPacket import PyPacket
-    from detect.port_scan import detect_port_scan
-    from detect.icmp_sweep import detect_sweep
-    from detect.arp_spoof import detect_arp_spoof
-    from detect.dns_tunnel import detect_dns_tunnel
-    from detect.honey_ports import detect_honey_port_connection
-    REAL_CAPTURE = True
-except ImportError:
-    REAL_CAPTURE = False
-    # Minimal stub so the rest of the file typechecks cleanly
-    class PyPacket:
-        def __init__(self, **kw):
-            for k,v in kw.items(): setattr(self,k,v)
+from capture.capture import begin_capture
+from capture.classes.PyPacket import PyPacket
+from detect.port_scan import detect_port_scan
+from detect.icmp_sweep import detect_sweep
+from detect.arp_spoof import detect_arp_spoof
+from detect.dns_tunnel import detect_dns_tunnel
+from detect.honey_ports import detect_honey_port_connection
+
+
+DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp", "dns_tunnel", "honey_port")
 
 
 # ── Bridge ─────────────────────────────────────────────────────────────────────
@@ -45,7 +39,7 @@ class CaptureBridge(QObject):
     def __init__(self, device_path: str = "", device_name: str = "", parent=None):
         super().__init__(parent)
         self.device_path  = device_path
-        self.device_name = device_name
+        self.device_name  = device_name
         self.stop_event   = threading.Event()
         self._threads     = []
         self._pkt_count   = 0
@@ -53,83 +47,154 @@ class CaptureBridge(QObject):
         self._proto_counts= {}
         self._lock        = threading.Lock()
 
-        # Detection enable flags (toggled from GUI)
-        self.detect_fast_scan  = True
-        self.detect_slow_scan  = True
-        self.detect_sweep      = True
-        self.detect_arp        = True
-        self.detect_dns_tunnel = False
+        # Per-detector stop events. Setting one of these stops just
+        # that detector; clearing + restarting its thread brings it back.
+        self._det_stops = {k: threading.Event() for k in DETECTOR_KEYS}
+
+        # Per-detector queues — kept alive across restarts so the capture
+        # thread keeps writing to a stable reference.
+        self._det_queues = {
+            "fast_scan":  queue.Queue(),
+            "slow_scan":  queue.Queue(),
+            "sweep":      queue.Queue(),
+            "arp":        queue.Queue(),
+            "dns_tunnel": queue.Queue(),
+            "honey_port": queue.Queue(),
+        }
+        self._det_threads = {k: None for k in DETECTOR_KEYS}
+
+        # Enabled flags — default all on
+        self._enabled = {k: True for k in DETECTOR_KEYS}
 
     # ── Public API ─────────────────────────────────────────────────────────────
     def start(self):
         self.stop()
         self.stop_event.clear()
+        for ev in self._det_stops.values():
+            ev.clear()
         with self._lock:
             self._pkt_count = 0
             self._drop_count = 0
             self._proto_counts = {}
-        if REAL_CAPTURE and self.device_path:
-            self._start_real()
-        else:
-            #self._start_demo()
-            ...
+
+        if not self.device_path:
+            return
+
+        self._start_capture()
+        for key in DETECTOR_KEYS:
+            if self._enabled[key]:
+                self._start_detector(key)
         self._start_stats_timer()
 
     def stop(self):
         self.stop_event.set()
+        for ev in self._det_stops.values():
+            ev.set()
         for t in self._threads:
             t.join(timeout=1.0)
         self._threads.clear()
+        self._det_threads = {k: None for k in DETECTOR_KEYS}
 
-    # ── Real capture ───────────────────────────────────────────────────────────
-    def _start_real(self):
-        cli_q    = queue.Queue()
-        fast_q   = queue.Queue()
-        slow_q   = queue.Queue()
-        icmp_q   = queue.Queue()
-        arp_q    = queue.Queue()
-        dns_q    = queue.Queue()
-        honey_port_q = queue.Queue()
-        ready    = threading.Event(); ready.set()
-        device   = self.device_name
+    def set_detector_enabled(self, key: str, enabled: bool):
+        """Enable or disable a single detector at runtime."""
+        if key not in self._enabled:
+            return
+        if self._enabled[key] == enabled:
+            return
+        self._enabled[key] = enabled
 
-        def _capture():
-            from capture.capture import begin_capture
+        if enabled:
+            # Drain any stale queued items so we don't alert on old data
+            q = self._det_queues[key]
+            try:
+                while True:
+                    q.get_nowait()
+            except queue.Empty:
+                pass
+            self._det_stops[key].clear()
+            if self.device_path and not self.stop_event.is_set():
+                self._start_detector(key)
+        else:
+            self._det_stops[key].set()
+            t = self._det_threads.get(key)
+            if t is not None:
+                t.join(timeout=1.0)
+            self._det_threads[key] = None
+
+    # ── Capture thread ─────────────────────────────────────────────────────────
+    def _start_capture(self):
+        cli_q = queue.Queue()
+        ready = threading.Event()
+        ready.set()
+
+        def _capture_real():
             begin_capture(
                 self.device_path.encode(),
-                arp_q, dns_q, honey_port_q, fast_q, slow_q, icmp_q, cli_q,
-                self.stop_event, ready
+                self._det_queues["arp"],
+                self._det_queues["dns_tunnel"],
+                self._det_queues["honey_port"],
+                self._det_queues["fast_scan"],
+                self._det_queues["slow_scan"],
+                self._det_queues["sweep"],
+                cli_q,
+                self.stop_event,
+                ready
             )
 
-        def _drain(q):
+        def _drain_cli():
             while not self.stop_event.is_set():
                 try:
-                    pkt = q.get(timeout=0.1)
+                    pkt = cli_q.get(timeout=0.1)
                     self._on_packet(pkt)
                 except queue.Empty:
                     continue
-                
-        def _emit_alert(severity, title, detail):
-            self.alert_fired.emit(severity, title, detail)
 
-        def _fast_scan():
-            detect_port_scan(device, fast_q, 10, 20, 30, self.stop_event, ready, alert_callback=_emit_alert)
-        def _slow_scan():
-            detect_port_scan(device, slow_q, 60, 50, 30, self.stop_event, ready, alert_callback=_emit_alert)
-        def _sweep():
-            detect_sweep(icmp_q, 5, 10, 300, self.stop_event, ready)
-        def _arp():
-            detect_arp_spoof(arp_q, 30, self.stop_event, ready, alert_callback=_emit_alert)
-        def _dns():
-            detect_dns_tunnel(dns_q, self.stop_event, ready, alert_callback=_emit_alert)
-        def _honey_port():
-            detect_honey_port_connection(device, honey_port_q, self.stop_event, ready, alert_callback=_emit_alert)
-
-        targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _arp, _dns, _honey_port]
-        for fn in targets:
+        for fn in (_capture_real, _drain_cli):
             t = threading.Thread(target=fn, daemon=True)
             t.start()
             self._threads.append(t)
+
+    # ── Detector threads ───────────────────────────────────────────────────────
+    def _start_detector(self, key: str):
+        if self._det_threads.get(key) is not None:
+            return
+
+        stop_ev = self._det_stops[key]
+        ready = threading.Event()
+        ready.set()
+        device = self.device_name
+
+        def _emit_alert(severity, title, detail):
+            # Guard against late-firing alerts after disable
+            if not stop_ev.is_set():
+                self.alert_fired.emit(severity, title, detail)
+
+        q = self._det_queues[key]
+
+        if key == "fast_scan":
+            target = lambda: detect_port_scan(
+                device, q, 10, 20, 30, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "slow_scan":
+            target = lambda: detect_port_scan(
+                device, q, 60, 50, 30, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "sweep":
+            target = lambda: detect_sweep(q, 5, 10, 300, stop_ev, ready)
+        elif key == "arp":
+            target = lambda: detect_arp_spoof(
+                q, 30, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "dns_tunnel":
+            target = lambda: detect_dns_tunnel(
+                q, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "honey_port":
+            target = lambda: detect_honey_port_connection(
+                device, q, stop_ev, ready, alert_callback=_emit_alert)
+        else:
+            return
+
+        t = threading.Thread(target=target, daemon=True)
+        t.start()
+        self._det_threads[key] = t
+        self._threads.append(t)
 
     # ── Internal ───────────────────────────────────────────────────────────────
     def _on_packet(self, pkt):

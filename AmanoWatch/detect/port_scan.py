@@ -88,7 +88,7 @@ class PortScan:
         if self.alert_callback:
             unique_ports = len({p for _, p in self.activity.get(src_ip, [])})
             self.alert_callback(
-                "critical",
+                "warning",
                 scan_type.upper() if scan_type else "unknown scan",
                 f"{scan_type} across {unique_ports} ports from {src_ip}"
             )

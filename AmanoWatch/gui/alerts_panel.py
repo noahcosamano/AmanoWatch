@@ -6,7 +6,7 @@ Right sidebar: threat alerts + blocked IPs list.
 import time
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
-    QPushButton, QLabel, QDialog, QFrame
+    QPushButton, QLabel, QDialog, QFrame, QButtonGroup
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 
@@ -15,6 +15,14 @@ from gui.widgets import AlertCard, mono_label, section_label, h_sep, PulseDot
 
 
 MAX_ALERTS = 50
+
+SEVERITIES = ("all", "critical", "warning", "info")
+SEVERITY_COLORS = {
+    "all":      TEXT_DIM,
+    "critical": RED,
+    "warning":  ORANGE,
+    "info":     CYAN,
+}
 
 
 # ── Alert Detail Dialog ────────────────────────────────────────────────────────
@@ -25,11 +33,7 @@ class AlertDetailDialog(QDialog):
         self.setMinimumSize(420, 280)
         self.setStyleSheet(f"background:{PANEL}; color:{TEXT};")
 
-        accent = {
-            "critical": RED,
-            "warning":  ORANGE,
-            "info":     CYAN,
-        }.get(severity, CYAN)
+        accent = SEVERITY_COLORS.get(severity, CYAN)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -64,6 +68,57 @@ class AlertDetailDialog(QDialog):
         btn_row.addStretch()
         btn_row.addWidget(dismiss)
         layout.addLayout(btn_row)
+
+
+# ── Severity filter button ─────────────────────────────────────────────────────
+class _FilterButton(QPushButton):
+    def __init__(self, key: str, label: str, parent=None):
+        super().__init__(label, parent)
+        self._key = key
+        self._active = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setCheckable(True)
+        self.setFixedHeight(22)
+        self._refresh()
+
+    def setActive(self, active: bool):
+        self._active = active
+        self.setChecked(active)
+        self._refresh()
+
+    def _refresh(self):
+        color = SEVERITY_COLORS.get(self._key, TEXT_DIM)
+        if self._active:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(0,212,255,0.08);
+                    color: {color};
+                    border: 1px solid {color};
+                    border-radius: 2px;
+                    padding: 2px 8px;
+                    font-family: "Courier New", monospace;
+                    font-size: 9px;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {TEXT_DIM};
+                    border: 1px solid {BORDER2};
+                    border-radius: 2px;
+                    padding: 2px 8px;
+                    font-family: "Courier New", monospace;
+                    font-size: 9px;
+                    letter-spacing: 1px;
+                }}
+                QPushButton:hover {{
+                    color: {color};
+                    border-color: {color};
+                }}
+            """)
 
 
 # ── Blocked IP row ─────────────────────────────────────────────────────────────
@@ -107,8 +162,11 @@ class AlertsPanel(QWidget):
         super().__init__(parent)
         self.setFixedWidth(290)
         self._alert_count  = 0
+        self._counts       = {"critical": 0, "warning": 0, "info": 0}
         self._blocked_ips  = {}   # ip -> expiry timestamp
         self._blocked_rows = {}   # ip -> BlockedRow widget
+        self._filter       = "all"
+        self._cards        = []   # list of (severity, AlertCard)
 
         self._build_ui()
 
@@ -135,6 +193,27 @@ class AlertsPanel(QWidget):
         hlay.addStretch()
         hlay.addWidget(self._cnt_lbl)
         root.addWidget(hdr)
+
+        # Severity filter row
+        filter_bar = QWidget()
+        filter_bar.setStyleSheet(f"background:{PANEL}; border-bottom:1px solid {BORDER};")
+        flay = QHBoxLayout(filter_bar)
+        flay.setContentsMargins(8, 6, 8, 6)
+        flay.setSpacing(4)
+
+        self._filter_btns = {}
+        self._filter_group = QButtonGroup(self)
+        self._filter_group.setExclusive(True)
+        for key in SEVERITIES:
+            label = "ALL" if key == "all" else key.upper()
+            btn = _FilterButton(key, label)
+            btn.clicked.connect(lambda _, k=key: self._set_filter(k))
+            self._filter_btns[key] = btn
+            self._filter_group.addButton(btn)
+            flay.addWidget(btn)
+        flay.addStretch()
+        self._filter_btns["all"].setActive(True)
+        root.addWidget(filter_bar)
 
         # Scroll area for alert cards
         self._alerts_area = QScrollArea()
@@ -190,6 +269,18 @@ class AlertsPanel(QWidget):
             "  No blocked IPs", size=9, color=TEXT_DIM)
         self._blocked_layout.insertWidget(0, self._empty_blocked)
 
+    # ── Filter ────────────────────────────────────────────────────────────────
+    def _set_filter(self, key: str):
+        self._filter = key
+        for k, btn in self._filter_btns.items():
+            btn.setActive(k == key)
+        self._apply_filter()
+
+    def _apply_filter(self):
+        for severity, card in self._cards:
+            visible = (self._filter == "all") or (severity == self._filter)
+            card.setVisible(visible)
+
     # ── Slot: receive alert ────────────────────────────────────────────────────
     @pyqtSlot(str, str, str)
     def on_alert(self, severity: str, title: str, body: str):
@@ -200,24 +291,28 @@ class AlertsPanel(QWidget):
         # Insert before stretch at end
         self._alerts_layout.insertWidget(
             self._alerts_layout.count() - 1, card)
+        self._cards.append((severity, card))
+
+        # Apply current filter to the new card
+        if self._filter != "all" and severity != self._filter:
+            card.setVisible(False)
 
         self._alert_count += 1
+        if severity in self._counts:
+            self._counts[severity] += 1
         self._cnt_lbl.setText(str(self._alert_count))
 
         # Auto-block critical alerts
         if severity == "critical":
-            # Try to parse an IP from the body
             import re
             m = re.search(r'\b(\d{1,3}(?:\.\d{1,3}){3})\b', body)
             if m:
                 self.block_ip(m.group(1))
 
         # Trim
-        while self._alerts_layout.count() - 1 > MAX_ALERTS:
-            item = self._alerts_layout.itemAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
-                self._alerts_layout.removeItem(item)
+        while len(self._cards) > MAX_ALERTS:
+            old_sev, old_card = self._cards.pop(0)
+            old_card.deleteLater()
 
         # Scroll to newest
         self._alerts_area.verticalScrollBar().setValue(

@@ -48,9 +48,6 @@ class MainWindow(QMainWindow):
         root.addWidget(self._build_header())
         root.addWidget(h_sep())
 
-        self._demo_banner = self._build_demo_banner()
-        root.addWidget(self._demo_banner)
-
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
@@ -61,7 +58,7 @@ class MainWindow(QMainWindow):
         body.addWidget(v_sep())
         body.addWidget(self._build_right_panel())
 
-        self._switch_tab("stream")
+        self._switch_tab("devices")
         root.addLayout(body, 1)
         root.addWidget(h_sep())
         root.addWidget(self._build_footer())
@@ -100,20 +97,21 @@ class MainWindow(QMainWindow):
 
         lay.addSpacing(24)
 
-        # Status pill
-        pill = QWidget()
-        pill.setStyleSheet(
-            f"background: rgba(0,255,136,0.05);"
-            f"border: 1px solid rgba(0,255,136,0.35);"
+        # Status pill — reflects whether capture is actually running
+        self._status_pill = QWidget()
+        self._status_pill.setStyleSheet(
+            f"background: rgba(74,122,153,0.05);"
+            f"border: 1px solid rgba(74,122,153,0.35);"
             f"border-radius: 2px;"
         )
-        pill_lay = QHBoxLayout(pill)
+        pill_lay = QHBoxLayout(self._status_pill)
         pill_lay.setContentsMargins(10, 4, 10, 4)
         pill_lay.setSpacing(6)
-        pill_lay.addWidget(PulseDot(GREEN, 7))
-        st = mono_label("IDS ACTIVE", size=10, color=GREEN)
-        pill_lay.addWidget(st)
-        lay.addWidget(pill)
+        self._status_dot = PulseDot(TEXT_DIM, 7)
+        pill_lay.addWidget(self._status_dot)
+        self._status_pill_lbl = mono_label("IDLE", size=10, color=TEXT_DIM)
+        pill_lay.addWidget(self._status_pill_lbl)
+        lay.addWidget(self._status_pill)
 
         lay.addStretch()
 
@@ -197,7 +195,7 @@ class MainWindow(QMainWindow):
             ("sweep",       "ICMP Sweep",       True),
             ("arp",         "ARP Spoof",        True),
             ("dns_tunnel",  "DNS Tunnel",       True),
-            ("honey_port",  "Honey Port Connection", True),
+            ("honey_port",  "Honey Port",       True),
         ):
             cb = QCheckBox(label)
             cb.setChecked(default)
@@ -248,34 +246,11 @@ class MainWindow(QMainWindow):
         lay.setSpacing(16)
 
         self._status_lbl = mono_label(
-            "System ready — select a device and begin capture",
+            "System ready — select a device from the Devices tab to begin capture",
             size=9, color=TEXT_DIM)
         lay.addWidget(self._status_lbl, 1)
 
-        self._mode_lbl = mono_label("DEMO MODE", size=9, color=ORANGE)
-        lay.addWidget(self._mode_lbl)
-
         return bar
-
-    # ── Demo banner ───────────────────────────────────────────────────────────
-    def _build_demo_banner(self):
-        banner = QWidget()
-        banner.setStyleSheet(
-            f"background: rgba(255,140,0,0.12);"
-            f"border-bottom: 1px solid rgba(255,140,0,0.4);"
-        )
-        lay = QHBoxLayout(banner)
-        lay.setContentsMargins(14, 6, 14, 6)
-        icon = mono_label("⚠", size=12, color=ORANGE)
-        msg  = mono_label(
-            "DEMO MODE — No real capture running. "
-            "Go to Devices, select an adapter, then click SELECT DEVICE to start live capture.",
-            size=10, color=ORANGE)
-        msg.setWordWrap(False)
-        lay.addWidget(icon)
-        lay.addSpacing(6)
-        lay.addWidget(msg, 1)
-        return banner
 
     # ─────────────────────────────────────────────────────────────────────────
     # Bridge wiring
@@ -285,17 +260,29 @@ class MainWindow(QMainWindow):
         self._bridge.packet_received.connect(self._stream_panel.on_packet)
         self._bridge.alert_fired.connect(self._alerts_panel.on_alert)
         self._bridge.stats_updated.connect(self._on_stats)
-        self._bridge.start()
+        # Don't start until a device is selected.
 
-        from gui.bridge import REAL_CAPTURE
-        if REAL_CAPTURE:
-            self._demo_banner.hide()
-            self._mode_lbl.setText("LIVE CAPTURE")
-            self._mode_lbl.setStyleSheet(f"color:{GREEN}; background:transparent;")
+    def _set_status_active(self, active: bool):
+        if active:
+            self._status_pill.setStyleSheet(
+                f"background: rgba(0,255,136,0.05);"
+                f"border: 1px solid rgba(0,255,136,0.35);"
+                f"border-radius: 2px;"
+            )
+            self._status_pill_lbl.setText("IDS ACTIVE")
+            self._status_pill_lbl.setStyleSheet(
+                f"color:{GREEN}; background:transparent;")
+            self._status_dot._color = QColor(GREEN)
         else:
-            self._demo_banner.show()
-            self._status_lbl.setText(
-                "Running in DEMO mode — go to Devices tab to connect real capture")
+            self._status_pill.setStyleSheet(
+                f"background: rgba(74,122,153,0.05);"
+                f"border: 1px solid rgba(74,122,153,0.35);"
+                f"border-radius: 2px;"
+            )
+            self._status_pill_lbl.setText("IDLE")
+            self._status_pill_lbl.setStyleSheet(
+                f"color:{TEXT_DIM}; background:transparent;")
+            self._status_dot._color = QColor(TEXT_DIM)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Slots
@@ -318,12 +305,10 @@ class MainWindow(QMainWindow):
         self._device_name = name
         self._device_lbl.setText(f"⬡  {name}")
         self._status_lbl.setText(f"Capturing on: {name}")
-        self._demo_banner.hide()
-        self._mode_lbl.setText("LIVE CAPTURE")
-        self._mode_lbl.setStyleSheet(f"color:{GREEN}; background:transparent;")
         self._bridge.device_path = path
         self._bridge.device_name = name
         self._bridge.start()
+        self._set_status_active(True)
         self._switch_tab("stream")
 
     def _switch_tab(self, key):
@@ -334,16 +319,17 @@ class MainWindow(QMainWindow):
 
     def _toggle_detector(self, key, state):
         checked = (state == Qt.CheckState.Checked.value)
-        attr_map = {
-            "fast_scan":  "detect_fast_scan",
-            "slow_scan":  "detect_slow_scan",
-            "sweep":      "detect_sweep",
-            "arp":        "detect_arp",
-            "dns_tunnel": "detect_dns_tunnel",
-            "honey_port": "detect_honey_port_connection"
-        }
-        if hasattr(self._bridge, attr_map[key]):
-            setattr(self._bridge, attr_map[key], checked)
+        self._bridge.set_detector_enabled(key, checked)
+        label = {
+            "fast_scan":  "Port Scan (Fast)",
+            "slow_scan":  "Port Scan (Slow)",
+            "sweep":      "ICMP Sweep",
+            "arp":        "ARP Spoof",
+            "dns_tunnel": "DNS Tunnel",
+            "honey_port": "Honey Port",
+        }.get(key, key)
+        verb = "enabled" if checked else "disabled"
+        self._status_lbl.setText(f"{label} detector {verb}")
 
     # ─────────────────────────────────────────────────────────────────────────
     # Clock
