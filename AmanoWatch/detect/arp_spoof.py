@@ -8,6 +8,7 @@ class ArpSpoof:
         self.packet_queue = packet_queue
         self.cooldown = cooldown
         self.arp_table = {}
+        self.last_alert = {} # source mac: timestamp
         self.alert_callback = alert_callback
         
     def process_packet(self, packet: PyPacket):
@@ -23,10 +24,19 @@ class ArpSpoof:
             return
         
         if src_ip not in self.arp_table:
+            print(f"DEBUG: Adding {src_ip} - {src_mac} to ARP Table")
             self.arp_table[src_ip] = [src_mac, now]
         
         elif self.arp_table[src_ip][0] != src_mac:
-            self.log_alert(src_ip, self.arp_table[src_ip][0], src_mac)
+            self.spoof_detected(src_ip, now, src_mac)
+            
+    def spoof_detected(self, src_ip, timestamp, src_mac):
+        last_time = self.last_alert.get(src_mac)
+        if last_time and (timestamp - last_time < self.cooldown):
+            return
+        print(f"DEBUG: {src_ip} changed from {self.arp_table[src_ip][0]} to {src_mac} ")
+        self.last_alert[src_mac] = timestamp
+        self.log_alert(src_ip, self.arp_table[src_ip][0], src_mac)
             
     def log_alert(self, ip, old_mac, new_mac):
         message = f"\n{time.ctime()}\nARP Spoof\n"

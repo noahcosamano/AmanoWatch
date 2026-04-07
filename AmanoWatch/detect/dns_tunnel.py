@@ -47,9 +47,7 @@ class DnsTunnel:
         entropy = self.string_entropy(subdomain_name)
         
         self.risk += entropy
-        #print(f"Domain: {domain} | Subdomain: {subdomain_name} | Subdomain Length: {subdomain_len}")
         self.risk += (subdomain_len * 0.01)
-        #print(f"Risk: {self.risk}")
         
         if (5.0 <= self.risk < 5.5):
             self.detect_tunnel(packet, domain, "MEDIUM")
