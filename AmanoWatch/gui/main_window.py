@@ -322,6 +322,7 @@ class MainWindow(QMainWindow):
         self._mode_lbl.setText("LIVE CAPTURE")
         self._mode_lbl.setStyleSheet(f"color:{GREEN}; background:transparent;")
         self._bridge.device_path = path
+        self._bridge.device_name = name
         self._bridge.start()
         self._switch_tab("stream")
 

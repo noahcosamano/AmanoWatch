@@ -123,7 +123,7 @@ class CaptureBridge(QObject):
         def _dns():
             detect_dns_tunnel(dns_q, self.stop_event, ready, alert_callback=_emit_alert)
         def _honey_port():
-            detect_honey_port_connection(honey_port_q, self.stop_event, ready, alert_callback=_emit_alert)
+            detect_honey_port_connection(device, honey_port_q, self.stop_event, ready, alert_callback=_emit_alert)
 
         targets = [_capture, lambda: _drain(cli_q), _fast_scan, _slow_scan, _arp, _dns, _honey_port]
         for fn in targets:

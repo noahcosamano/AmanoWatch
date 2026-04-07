@@ -116,9 +116,8 @@ def send_arp(target_ip, spoof_ip, spoof_mac, num_packets=1):
     eth = Ether(dst="ff:ff:ff:ff:ff:ff", src=SRC_MAC)
     sendp([eth / arp] * num_packets, iface="Wi-Fi", verbose=True)
 
-
 def main():
     #send_ftp(20)
-    send_arp("129.21.102.104", "192.168.1.3", "aa:bb:cc:dd:ee:ff", 20)
+    send_arp("129.21.102.104", "192.168.1.3", "ab:bb:cc:dd:ee:ff", 20)
 
 main()

@@ -13,7 +13,7 @@ class PortScan:
         self.quantity = quantity
         self.cooldown = cooldown
         self.gateway = get_gateway()
-        self.host_ip = get_ip(device)
+        self.host_ip = get_ip(device).replace("(Preferred)","").strip()
         self.last_alert = {}   # src_ip -> {flag: last_alert_time}
         self.activity = {}     # src_ip -> list of (timestamp, dst_port)
         self.num_flags = {}    # src_ip -> {flag: count}
@@ -28,13 +28,13 @@ class PortScan:
         if not src_ip or not dst_port:
             return
 
-        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("128."):
+        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("127."):
             return
 
         if dst_port >= 1024:
             return
         
-        if self.host_ip and self.host_ip.replace("(Preferred)", "").strip() == src_ip:
+        if self.host_ip and self.host_ip == src_ip:
             ...
 
         if src_ip not in self.activity:

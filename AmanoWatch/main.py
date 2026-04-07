@@ -4,6 +4,7 @@ from detect.port_scan import detect_port_scan
 from detect.icmp_sweep import detect_sweep
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.arp_spoof import detect_arp_spoof
+from detect.honey_ports import detect_honey_port_connection
 import threading
 import queue
 import time
@@ -105,6 +106,13 @@ def main():
         name="DNS TUNNEL",
         daemon=True
     )
+    
+    honey_port_thread = threading.Thread(
+        target=detect_honey_port_connection,
+        args=(device_name, honey_port_queue, stop_event, cli_ready_event),
+        name="HONEY PORT",
+        daemon=True
+    )
 
     # Need to find a way to prevent so many threads being used, going to slow program
     capture_thread.start()
@@ -113,6 +121,7 @@ def main():
     sweep_thread.start()
     arp_spoof_thread.start()
     dns_tunnel_thread.start()
+    honey_port_thread.start()
     
     try:
         while cli_thread.is_alive():
@@ -131,5 +140,6 @@ def main():
         sweep_thread.join(timeout=1)
         arp_spoof_thread.join(timeout=1)
         dns_tunnel_thread.join(timeout=1)
+        honey_port_thread.join(timeout=1)
 
 main()
