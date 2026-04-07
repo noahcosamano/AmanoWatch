@@ -20,7 +20,7 @@ class PortScan:
         self.alert_callback = alert_callback
 
     def process_packet(self, packet: PyPacket):
-        now = packet.timestamp
+        now = packet.timestamp 
         src_ip = packet.src_ip
         dst_port = packet.dst_port
         flags = packet.flags or "NONE"

