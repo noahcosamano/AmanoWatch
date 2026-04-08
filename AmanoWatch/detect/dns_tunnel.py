@@ -40,11 +40,11 @@ class DnsTunnel:
         self.risk += (subdomain_len * 0.01)
         
         if (5.0 <= self.risk < 5.5):
-            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "MEDIUM")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "medium")
         elif (5.5 <= self.risk < 6.0):
-            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "HIGH")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "high")
         elif (6.0 <= self.risk):
-            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "CRITICAL")
+            self.detect_tunnel(packet, domain, subdomain_len, entropy, self.risk, "critical")
             
         self.risk = 0
         

@@ -5,7 +5,7 @@ Right sidebar: threat alerts + blocked IPs list.
 
 import time
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea,
     QPushButton, QLabel, QDialog, QFrame, QButtonGroup
 )
 from PyQt6.QtCore import Qt, pyqtSlot
@@ -16,12 +16,14 @@ from gui.widgets import AlertCard, mono_label, section_label, h_sep, PulseDot
 
 MAX_ALERTS = 50
 
-SEVERITIES = ("all", "critical", "warning", "info")
+SEVERITIES = ("all", "critical", "high", "medium", "warning", "info")
 SEVERITY_COLORS = {
     "all":      TEXT_DIM,
     "critical": RED,
-    "warning":  ORANGE,
-    "info":     CYAN,
+    "high":     ORANGE,
+    "medium":   YELLOW,
+    "warning":  CYAN,
+    "info":     GREEN,
 }
 
 
@@ -78,7 +80,7 @@ class _FilterButton(QPushButton):
         self._active = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setCheckable(True)
-        self.setFixedHeight(22)
+        self.setFixedHeight(26)
         self._refresh()
 
     def setActive(self, active: bool):
@@ -95,9 +97,9 @@ class _FilterButton(QPushButton):
                     color: {color};
                     border: 1px solid {color};
                     border-radius: 2px;
-                    padding: 2px 8px;
+                    padding: 4px 10px;
                     font-family: "Courier New", monospace;
-                    font-size: 9px;
+                    font-size: 11px;
                     font-weight: bold;
                     letter-spacing: 1px;
                 }}
@@ -109,9 +111,9 @@ class _FilterButton(QPushButton):
                     color: {TEXT_DIM};
                     border: 1px solid {BORDER2};
                     border-radius: 2px;
-                    padding: 2px 8px;
+                    padding: 4px 10px;
                     font-family: "Courier New", monospace;
-                    font-size: 9px;
+                    font-size: 11px;
                     letter-spacing: 1px;
                 }}
                 QPushButton:hover {{
@@ -162,7 +164,7 @@ class AlertsPanel(QWidget):
         super().__init__(parent)
         self.setFixedWidth(290)
         self._alert_count  = 0
-        self._counts       = {"critical": 0, "warning": 0, "info": 0}
+        self._counts       = {"critical": 0, "high": 0, "medium": 0, "warning": 0, "info": 0}
         self._blocked_ips  = {}   # ip -> expiry timestamp
         self._blocked_rows = {}   # ip -> BlockedRow widget
         self._filter       = "all"
@@ -182,36 +184,52 @@ class AlertsPanel(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Header
+        # Header with CLEAR button
         hdr = QWidget()
         hdr.setStyleSheet(f"background:{PANEL}; border-bottom:1px solid {BORDER};")
         hlay = QHBoxLayout(hdr)
         hlay.setContentsMargins(12, 10, 12, 10)
         self._hdr_lbl = section_label("THREAT ALERTS")
         self._cnt_lbl = mono_label("0", size=11, color=RED, bold=True)
+
+        clear_btn = QPushButton("CLEAR")
+        clear_btn.setObjectName("secondary")
+        clear_btn.setFixedHeight(22)
+        clear_btn.setFixedWidth(60)
+        clear_btn.clicked.connect(self._clear_alerts)
+
         hlay.addWidget(self._hdr_lbl)
         hlay.addStretch()
         hlay.addWidget(self._cnt_lbl)
+        hlay.addSpacing(8)
+        hlay.addWidget(clear_btn)
         root.addWidget(hdr)
 
-        # Severity filter row
+        # Severity filter grid (2 rows × 3 columns)
         filter_bar = QWidget()
         filter_bar.setStyleSheet(f"background:{PANEL}; border-bottom:1px solid {BORDER};")
-        flay = QHBoxLayout(filter_bar)
-        flay.setContentsMargins(8, 6, 8, 6)
-        flay.setSpacing(4)
+        fgrid = QGridLayout(filter_bar)
+        fgrid.setContentsMargins(8, 8, 8, 8)
+        fgrid.setHorizontalSpacing(6)
+        fgrid.setVerticalSpacing(6)
 
         self._filter_btns = {}
         self._filter_group = QButtonGroup(self)
         self._filter_group.setExclusive(True)
-        for key in SEVERITIES:
+
+        for i, key in enumerate(SEVERITIES):
             label = "ALL" if key == "all" else key.upper()
             btn = _FilterButton(key, label)
+            btn.setMinimumWidth(80)
             btn.clicked.connect(lambda _, k=key: self._set_filter(k))
             self._filter_btns[key] = btn
             self._filter_group.addButton(btn)
-            flay.addWidget(btn)
-        flay.addStretch()
+            row, col = divmod(i, 3)
+            fgrid.addWidget(btn, row, col)
+
+        for c in range(3):
+            fgrid.setColumnStretch(c, 1)
+
         self._filter_btns["all"].setActive(True)
         root.addWidget(filter_bar)
 
@@ -280,6 +298,15 @@ class AlertsPanel(QWidget):
         for severity, card in self._cards:
             visible = (self._filter == "all") or (severity == self._filter)
             card.setVisible(visible)
+
+    # ── Clear all alerts ──────────────────────────────────────────────────────
+    def _clear_alerts(self):
+        for _sev, card in self._cards:
+            card.deleteLater()
+        self._cards.clear()
+        self._alert_count = 0
+        self._counts = {k: 0 for k in self._counts}
+        self._cnt_lbl.setText("0")
 
     # ── Slot: receive alert ────────────────────────────────────────────────────
     @pyqtSlot(str, str, str)

@@ -153,7 +153,7 @@ class MiniBar(QWidget):
 class AlertCard(QWidget):
     clicked = pyqtSignal(str, str, str)   # severity, title, body
 
-    _ACCENT = {"critical": RED, "warning": ORANGE, "info": CYAN}
+    _ACCENT = {"critical": RED, "high": ORANGE, "medium": YELLOW, "warning": CYAN, "info": GREEN}
 
     def __init__(self, severity: str, title: str, body: str, ts: str, parent=None):
         super().__init__(parent)

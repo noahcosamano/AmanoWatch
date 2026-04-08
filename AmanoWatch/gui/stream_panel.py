@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QComboBox, QLabel, QLineEdit, QAbstractItemView,
     QHeaderView, QSizePolicy, QDialog, QTextEdit, QDialogButtonBox,
-    QScrollArea
+    QScrollArea, QCompleter
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, QStringListModel
 from PyQt6.QtGui import QColor, QFont, QBrush
 
 from gui.theme import *
@@ -21,7 +21,8 @@ from gui.widgets import ProtoBadge, mono_label, section_label, h_sep
 COLS = ["TIME", "PROTO", "SRC IP", "DST IP", "SRC PORT", "DST PORT", "FLAGS", "INFO"]
 COL_WIDTHS = [80, 68, 130, 130, 75, 75, 100, 180]
 
-MAX_ROWS = 500   # cap before old rows are dropped
+MAX_ROWS    = 500    # cap of rows displayed in the table
+MAX_HISTORY = 2000   # packets retained for re-filtering
 
 
 # ── Packet Detail Dialog ───────────────────────────────────────────────────────
@@ -87,12 +88,14 @@ class PacketDetailDialog(QDialog):
 class StreamPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._capturing   = True
-        self._proto_filter= "ALL"
-        self._flag_filter = "ALL"
-        self._search      = ""
-        self._pending     = []   # packets queued between timer ticks
-        self._row_count   = 0
+        self._capturing    = True
+        self._proto_filter = "ALL"
+        self._flag_filter  = "ALL"
+        self._search       = ""
+        self._pending      = []          # packets queued between timer ticks
+        self._history      = []          # rolling list of all captured pkts for re-filter
+        self._suggestions  = set()       # autocomplete values
+        self._completer_model = QStringListModel([])
 
         self._build_ui()
 
@@ -141,12 +144,18 @@ class StreamPanel(QWidget):
 
         lay.addSpacing(8)
 
-        # Search
+        # Search with autocomplete
         lay.addWidget(section_label("SEARCH:"))
         self._search_box = QLineEdit()
         self._search_box.setPlaceholderText("IP, port, protocol…")
-        self._search_box.setFixedWidth(160)
+        self._search_box.setFixedWidth(180)
         self._search_box.textChanged.connect(self._set_search)
+
+        completer = QCompleter(self._completer_model, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._search_box.setCompleter(completer)
         lay.addWidget(self._search_box)
 
         lay.addStretch()
@@ -201,6 +210,20 @@ class StreamPanel(QWidget):
     # ── Slot: receive packet from bridge ─────────────────────────────────────
     @pyqtSlot(object)
     def on_packet(self, pkt):
+        # Always buffer so filter changes can replay history
+        self._history.append(pkt)
+        if len(self._history) > MAX_HISTORY:
+            self._history.pop(0)
+
+        # Harvest autocomplete tokens
+        for v in (getattr(pkt, 'src_ip', None),
+                  getattr(pkt, 'dst_ip', None),
+                  getattr(pkt, 'protocol', None),
+                  str(getattr(pkt, 'src_port', '') or ''),
+                  str(getattr(pkt, 'dst_port', '') or '')):
+            if v:
+                self._suggestions.add(str(v))
+
         if self._capturing:
             self._pending.append(pkt)
 
@@ -225,6 +248,27 @@ class StreamPanel(QWidget):
             for _ in range(overflow):
                 self._table.removeRow(self._table.rowCount() - 1)
 
+        self._table.setUpdatesEnabled(True)
+        self._row_lbl.setText(f"{self._table.rowCount()} rows")
+
+        # Refresh autocomplete model
+        self._refresh_completer()
+
+    def _refresh_completer(self):
+        self._completer_model.setStringList(sorted(self._suggestions))
+
+    def _rebuild_from_history(self):
+        """Re-render the table from _history using current filters."""
+        self._table.setUpdatesEnabled(False)
+        self._table.setRowCount(0)
+        # _insert_row prepends rows, so iterate oldest→newest to get newest on top
+        shown = 0
+        for pkt in self._history:
+            if self._matches(pkt):
+                self._insert_row(pkt)
+                shown += 1
+                if shown >= MAX_ROWS:
+                    break
         self._table.setUpdatesEnabled(True)
         self._row_lbl.setText(f"{self._table.rowCount()} rows")
 
@@ -302,11 +346,20 @@ class StreamPanel(QWidget):
 
     def _clear(self):
         self._table.setRowCount(0)
+        self._history.clear()
         self._row_lbl.setText("0 rows")
 
-    def _set_proto(self, v):  self._proto_filter = v
-    def _set_flag(self, v):   self._flag_filter  = v
-    def _set_search(self, v): self._search = v.strip()
+    def _set_proto(self, v):
+        self._proto_filter = v
+        self._rebuild_from_history()
+
+    def _set_flag(self, v):
+        self._flag_filter = v
+        self._rebuild_from_history()
+
+    def _set_search(self, v):
+        self._search = v.strip()
+        self._rebuild_from_history()
 
     def _open_detail(self, row, _col):
         item = self._table.item(row, 0)
