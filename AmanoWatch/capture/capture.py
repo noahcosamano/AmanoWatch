@@ -6,77 +6,96 @@ from capture.parse.flags import format_flags
 from capture.parse.protocol import parse_protocol
 from utils.load_dll import get_dll_path
 from utils.ui_helpers import error
-from queue import Queue
 import ctypes
 
-# I don't think this function is necessary, in the future I intend on scrapping PyPackets entirely
-# because it's a lot of overhead time for the system
+
+# Batch size — acts as a ceiling. C returns early on pcap timeout (100ms),
+# so on quiet links you get whatever's ready after 100ms regardless of size.
+PACKET_BATCH_SIZE = 1000
+
+# GUI sampling — only forward 1 in N packets to the CLI queue under load.
+# The GUI only displays ~500 rows anyway and batches on a 60ms timer, so
+# feeding it 100k pps is pure waste. Sampling kicks in automatically.
+CLI_SAMPLE_THRESHOLD = 5000   # packets/sec above which we start sampling
+CLI_SAMPLE_RATE_HIGH = 10     # 1 in 10 when over threshold
+
+
 def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
                         src_port, dst_port, query, query_len, timestamp):
-    
-    pypacket = PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip, 
-                   src_port, dst_port, flags, query, query_len, timestamp)
-    
-    return pypacket
+    return PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip,
+                    src_port, dst_port, flags, query, query_len, timestamp)
 
-def queue(arp_queue, dns_queue, honey_port_queue, fast_scan_queue, slow_scan_queue, icmp_queue, cli_queue, packet: PyPacket):
-    cli_queue.put(packet)
-    
-    if packet.protocol == "ARP":
-        arp_queue.put(packet)
-    elif packet.protocol == "DNS":
-        dns_queue.put(packet)
-    elif packet.protocol in ("TCP", "UDP"):
-        fast_scan_queue.put(packet)
-        slow_scan_queue.put(packet)
-        honey_port_queue.put(packet)
-    elif packet.protocol == "ICMP":
-        icmp_queue.put(packet)
 
-def begin_capture(device, arp_queue, dns_queue, honey_port_queue, fast_scan_queue, 
+def _route(arp_q, dns_q, honey_q, fast_q, slow_q, icmp_q, cli_q,
+           packet: PyPacket, cli_skip: int, cli_counter: int):
+    """
+    Route a packet to relevant detector queues.
+    Returns the updated cli_counter.
+    """
+    proto = packet.protocol
+
+    if proto == "ARP":
+        arp_q.put(packet)
+    elif proto == "DNS":
+        dns_q.put(packet)
+    elif proto in ("TCP", "UDP"):
+        fast_q.put(packet)
+        slow_q.put(packet)
+        honey_q.put(packet)
+    elif proto == "ICMP":
+        icmp_q.put(packet)
+
+    # Sampled CLI feed — skip entirely when cli_skip > 1
+    if cli_skip <= 1 or (cli_counter % cli_skip == 0):
+        cli_q.put(packet)
+
+    return cli_counter + 1
+
+
+def begin_capture(device, arp_queue, dns_queue, honey_port_queue, fast_scan_queue,
                   slow_scan_queue, icmp_queue, cli_queue, stop_event, cli_ready):
-    PCAP_ERRBUF_SIZE = 256 # Size of buffer in bytes
-    # This is the error buffer passed into InitCapture in dll so python can see error messages
+    PCAP_ERRBUF_SIZE = 256
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
-    
-    # I should make this part of the get_dll_path function since it's repeated in many modules
+
     dll_path = get_dll_path("capture.dll")
     try:
-        lib = ctypes.CDLL(dll_path, errbuf)
-    except OSError as e:
+        lib = ctypes.CDLL(dll_path)
+    except OSError:
         error(f"DLL not found at {dll_path}")
         return
 
-    # Defines C argument types for each function
     lib.InitCapture.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-    # Defines C return types for each function
     lib.InitCapture.restype = ctypes.c_int
-    
-    lib.GetNextPacketCache.argtypes = [ctypes.POINTER(CPacket)]
+
+    # Updated signature: now takes max_count
+    lib.GetNextPacketCache.argtypes = [ctypes.POINTER(CPacket), ctypes.c_int]
     lib.GetNextPacketCache.restype = ctypes.c_int
-    
+
     lib.CloseCapture.argtypes = []
     lib.CloseCapture.restype = None
 
-    # Attempt to open capture handle from C.
     if not lib.InitCapture(device, errbuf):
-        error(errbuf)
+        error(errbuf.value.decode(errors="ignore"))
         return
 
-    cpacket = CPacket()
-    
-    packet_batch_size = 20 # Rather than bouncing back and forth with each packet captured, C sends 50 packets at a time to python
-    packet_array = (CPacket * packet_batch_size)()
+    # Pre-allocated packet cache — reused across batches
+    packet_array = (CPacket * PACKET_BATCH_SIZE)()
+
+    # Adaptive GUI sampling state
+    import time
+    last_rate_check = time.time()
+    packets_since_check = 0
+    cli_skip = 1        # 1 = send everything to CLI
+    cli_counter = 0
 
     try:
         while not stop_event.is_set() and cli_ready.is_set():
-            # GetNextPacket called from capture.c in dll, return code stores as result
-            count = lib.GetNextPacketCache(packet_array) # Amount of packets in the cache returned by capture.c
-            
+            count = lib.GetNextPacketCache(packet_array, PACKET_BATCH_SIZE)
+
             if count > 0:
                 for i in range(count):
                     cpacket = packet_array[i]
-                    
+
                     src_ip = format_ip(cpacket.src_ip, cpacket.is_ipv6)
                     dst_ip = format_ip(cpacket.dst_ip, cpacket.is_ipv6)
                     flags = format_flags(cpacket.tcp_flags)
@@ -84,29 +103,46 @@ def begin_capture(device, arp_queue, dns_queue, honey_port_queue, fast_scan_queu
                     dst_mac = format_mac(cpacket.dst_mac)
                     raw_payload = None
                     payload_len = None
-                    
+
                     try:
                         if cpacket.payload_len > 0:
                             raw_payload = ctypes.string_at(cpacket.payload, cpacket.payload_len)
                             payload_len = cpacket.payload_len
-                            
                     except Exception as e:
                         error(f"Failed to read payload: {e}")
-                    
-                    # Protocol has to be assigned last since fields like payload are used in defining protocol
-                    protocol = parse_protocol(cpacket.protocol, cpacket.app_protocol)
-                
-                    pypacket = convert_to_pypacket(protocol, cpacket.type, flags, src_mac, 
-                                                dst_mac,src_ip, dst_ip, cpacket.src_port,
-                                                cpacket.dst_port, raw_payload, payload_len, cpacket.tv_sec)
-                
-                    queue(arp_queue, dns_queue, honey_port_queue, fast_scan_queue, slow_scan_queue, icmp_queue, cli_queue, pypacket)
 
-            elif count < 0: # Abnormal failure, tell the user and close capture
-                error(errbuf)
+                    protocol = parse_protocol(cpacket.protocol, cpacket.app_protocol)
+
+                    pypacket = convert_to_pypacket(
+                        protocol, cpacket.type, flags, src_mac, dst_mac,
+                        src_ip, dst_ip, cpacket.src_port, cpacket.dst_port,
+                        raw_payload, payload_len, cpacket.tv_sec)
+
+                    cli_counter = _route(
+                        arp_queue, dns_queue, honey_port_queue,
+                        fast_scan_queue, slow_scan_queue, icmp_queue,
+                        cli_queue, pypacket, cli_skip, cli_counter)
+
+                packets_since_check += count
+
+                # Recompute sample rate every ~500ms
+                now = time.time()
+                elapsed = now - last_rate_check
+                if elapsed >= 0.5:
+                    pps = packets_since_check / elapsed
+                    if pps > CLI_SAMPLE_THRESHOLD:
+                        cli_skip = CLI_SAMPLE_RATE_HIGH
+                    else:
+                        cli_skip = 1
+                    packets_since_check = 0
+                    last_rate_check = now
+
+            elif count < 0:
+                error(errbuf.value.decode(errors="ignore"))
                 break
+            # count == 0 is just a pcap timeout on a quiet link — loop continues
 
     except KeyboardInterrupt:
         print("\nStopping capture...")
     finally:
-        lib.CloseCapture() # CloseCapture called from capture.c, closes capture handle created
+        lib.CloseCapture()

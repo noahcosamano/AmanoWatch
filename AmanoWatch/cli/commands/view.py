@@ -3,96 +3,101 @@ from capture.classes.PyPacket import PyPacket
 from utils.ui_helpers import clear
 from queue import Empty
 import msvcrt
-import os
 import time
 
-def execute(packet_queue, target, wait_ms, stop_event):
-    # If a string is passed, it must be protocol filtered and this will execute
-    if isinstance(target, str):
-        clear()
-        print(f"\nListening for {target} packets (delay={wait_ms}ms)...")
-        view_proto(packet_queue, target, stop_event, wait_ms)
-    else:
-        # Otherwise it must be port filtered and this will execute
-        clear()
-        print(f"\nListening on port {target} (delay={wait_ms}ms)...")
-        view_port(packet_queue, target, stop_event, wait_ms)
-        
-# NOTE: The two functions below need to be combined into one
 
-# Function called if a protocol is passed into "view"
-def view_proto(packet_queue, proto, stop_event, wait_ms: int):
-    selected_proto = proto.upper()
-    
+# When the queue is this deep, drain+discard to catch up instead of printing
+DRAIN_THRESHOLD = 2000
+
+# Warn at most once per second
+WARN_INTERVAL = 1.0
+
+def execute(packet_queue, target, wait_ms, stop_event):
+    clear()
+    if isinstance(target, str):
+        print(f"\nListening for {target} packets (delay={wait_ms}ms)...")
+        matcher = _proto_matcher(target)
+    else:
+        print(f"\nListening on port {target} (delay={wait_ms}ms)...")
+        matcher = _port_matcher(target)
+
+    _view_loop(packet_queue, matcher, stop_event, wait_ms)
+
+
+# ── Matchers ─────────────────────────────────────────────────────────────────
+def _proto_matcher(proto):
+    selected = proto.upper()
     udp_names = set(udp_service_ports.values())
     tcp_names = set(tcp_service_ports.values())
-    
-    # Converts milliseconds into seconds
+
+    def _match(pkt):
+        if selected == "ALL":
+            return True
+        p = pkt.protocol
+        if p == selected:
+            return True
+        if selected == "UDP" and p in udp_names:
+            return True
+        if selected == "TCP" and p in tcp_names:
+            return True
+        return False
+
+    return _match
+
+
+def _port_matcher(port):
+    def _match(pkt):
+        return pkt.src_port == port or pkt.dst_port == port
+    return _match
+
+
+# ── Main loop ────────────────────────────────────────────────────────────────
+def _view_loop(packet_queue, matches, stop_event, wait_ms):
     wait_seconds = wait_ms / 1000
 
-    # This checks for keyboard input in order to break from currently executing command
+    # Flush stdin
     while msvcrt.kbhit():
         msvcrt.getch()
 
-    # To break from currently executing command
     print("\nPress ANY key to stop...\n")
 
-    # Stop event to end current command
+    last_warn = 0.0
+    dropped_since_warn = 0
+
     while not stop_event.is_set():
         if msvcrt.kbhit():
             msvcrt.getch()
             stop_event.set()
             clear()
             break
-        
-        if packet_queue.qsize() > 1000:
-            print(f"--- WARNING: Queue Backlog! ({packet_queue.qsize()} packets waiting) ---")
+
+        qsize = packet_queue.qsize()
+
+        # If we're falling behind, drain aggressively and drop what we can't print
+        if qsize > DRAIN_THRESHOLD:
+            discarded = 0
+            while packet_queue.qsize() > DRAIN_THRESHOLD // 2:
+                try:
+                    packet_queue.get_nowait()
+                    discarded += 1
+                except Empty:
+                    break
+            dropped_since_warn += discarded
+
+            now = time.time()
+            if now - last_warn >= WARN_INTERVAL:
+                print(f"--- BACKLOG: dropped {dropped_since_warn} packets to catch up "
+                      f"(queue was {qsize}) ---")
+                last_warn = now
+                dropped_since_warn = 0
+            continue
 
         try:
             packet = packet_queue.get(timeout=0.1)
         except Empty:
             continue
-        
-        is_udp_match = (selected_proto == "UDP" and (packet.protocol == "UDP" or packet.protocol in udp_names))
-        is_tcp_match = (selected_proto == "TCP" and (packet.protocol == "TCP" or packet.protocol in tcp_names))
-        is_exact_match = (packet.protocol == selected_proto)
 
-        # Only prints packet if the protocol matches user input, user can type ALL to view all packets
-        if selected_proto == "ALL" or is_udp_match or is_tcp_match or is_exact_match:
+        if matches(packet):
             print(packet)
-            
-            # So terminal does not clog up under high traffic, if the user decides to use
-            if wait_seconds > 0:
-                time.sleep(wait_seconds)
-                
-# Function called if port is passed into "view"
-def view_port(packet_queue, port, stop_event, wait_ms: int):
-    # function runs identically to above function, view above for comments
-    # I intend to combine the two into one in attempt to limit redundancy
-    wait_seconds = wait_ms / 1000
-    
-    while msvcrt.kbhit():
-        msvcrt.getch()
-
-    print("\nPress ANY key to stop...\n")
-    
-    while not stop_event.is_set():
-        if msvcrt.kbhit():
-            msvcrt.getch()
-            stop_event.set()
-            os.system("cls")
-            break
-        
-        if packet_queue.qsize() > 1000:
-            print(f"--- WARNING: Queue Backlog! ({packet_queue.qsize()} packets waiting) ---")
-
-        try:
-            packet: PyPacket = packet_queue.get_nowait()
-        except Empty:
-            continue
-
-        if packet.src_port == port or packet.dst_port == port:
-            print(packet)
-            
             if wait_seconds > 0:
                 time.sleep(wait_seconds)
