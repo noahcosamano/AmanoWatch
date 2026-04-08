@@ -1,6 +1,6 @@
 from capture.classes.PyPacket import PyPacket
 from detect.config import DNS_WHITELIST
-from database.add_detection import add_detection
+from database.edit import add_detection
 import math
 from collections import Counter 
 

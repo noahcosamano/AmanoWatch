@@ -19,8 +19,6 @@ def search_ip(ip):
     try:
         response = _reader.country(ip)
         name = response.country.name
-        print(f"[geo] {ip} -> country.name={name!r} iso={response.country.iso_code!r}")
         return name
     except geoip2.errors.AddressNotFoundError:
-        print(f"[geo] {ip} -> NOT IN DB")
         return None

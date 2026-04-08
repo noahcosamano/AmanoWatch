@@ -1,6 +1,6 @@
 from capture.classes.PyPacket import PyPacket
 from network.block_mac import unblock_mac, block_mac
-from database.add_detection import add_detection
+from database.edit import add_detection
 
 class ArpSpoof:
     def __init__(self, packet_queue, cooldown, alert_callback=None):

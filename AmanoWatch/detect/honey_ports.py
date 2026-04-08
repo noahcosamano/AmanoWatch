@@ -1,6 +1,6 @@
 from detect.config import HONEY_PORTS
 from capture.classes.PyPacket import PyPacket
-from database.add_detection import add_detection
+from database.edit import add_detection
 from network.block_ip import block_ip, unblock_ip
 from network.get_gateway import get_gateway
 from network.get_ip import get_ip

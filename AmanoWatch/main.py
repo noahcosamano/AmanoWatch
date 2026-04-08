@@ -6,6 +6,7 @@ from detect.dns_tunnel import detect_dns_tunnel
 from detect.arp_spoof import detect_arp_spoof
 from detect.honey_ports import detect_honey_port_connection
 from database.init_db import init_db
+from database.edit import purge_low_severity
 import threading
 import queue
 import time
@@ -32,6 +33,7 @@ cli_ready_event = threading.Event() # Tells all other threads that the user has 
   
 def main():
     init_db()
+    purge_low_severity()
     # All detectors and cli have their own packet queue to prevent race conditions and packet loss between queues
     cli_queue = queue.Queue() 
     slow_scan_queue = queue.Queue()

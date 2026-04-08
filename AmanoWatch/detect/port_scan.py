@@ -3,7 +3,7 @@ from network.block_ip import block_ip, unblock_ip
 from network.get_gateway import get_gateway
 from network.get_ip import get_ip
 from detect.config import FLAG_TO_NAME
-from database.add_detection import add_detection
+from database.edit import add_detection
 import time
 import traceback
 

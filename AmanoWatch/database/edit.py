@@ -43,3 +43,15 @@ def add_detection(detector_type, severity, summary,
 
     conn.commit()
     conn.close()
+    
+def purge_low_severity():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.execute(
+            "DELETE FROM detections WHERE LOWER(severity) IN (?, ?)",
+            ("info", "low")
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
