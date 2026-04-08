@@ -1,5 +1,5 @@
 from cli.verify import verify_target
-from cli.commands import view, devices, stats
+from cli.commands import view, devices, stats, history
 from utils.ui_helpers import error
 
 def parse_wait(parts):
@@ -41,18 +41,24 @@ def parse_command(packet_queue, cmd: str, stop_event):
         view.execute(packet_queue, target, wait_ms, stop_event)
         return
     
-    if command == "devices": # View all network devices on computer
+    elif command == "devices": # View all network devices on computer
         if len(parts) > 1:
             error("'devices' takes no arguments")
             
         devices.execute(stop_event)
         return
     
-    if command == "stats": # View network capture statistic such as packet loss
+    elif command == "stats": # View network capture statistic such as packet loss
         if len(parts) > 1:
             error("'stats' takes no arguments")
             
         stats.execute(stop_event)
         return
     
-    error("Invalid command")
+    elif command == "history": # Query SQL db to view detections
+        #input("DEBUG: Command is history")
+        history.execute(cmd)
+    
+    
+    else:
+        error("Invalid command")

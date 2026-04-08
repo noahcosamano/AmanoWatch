@@ -23,7 +23,6 @@ class ArpSpoof:
             return
         
         if src_ip not in self.arp_table:
-            print(f"DEBUG: Adding {src_ip} - {src_mac} to ARP Table")
             self.arp_table[src_ip] = [src_mac, now]
         
         elif self.arp_table[src_ip][0] != src_mac:

@@ -6,8 +6,17 @@ def welcome(device):
     print("\n\033[1mAVAILABLE COMMANDS:\033[0m")
 
     # Command: View
-    print("\n  \033[94mview\033[0m [proto|port] \033[2m-wait=[ms]\033[0m")
+    print("\n  \033[94mview\033[0m [proto|port] \033[2m-[wait=ms]\033[0m")
     print("  └─ Stream live traffic. (e.g., 'view tcp')")
+    
+    # Command: history
+    print(
+        "\n  \033[94mhistory\033[0m "
+        "\033[2m[-n=N] [-ip=ADDR] [-severity=LEVEL] "
+        "[-detector=TYPE] [-since=TIME] [-date=YYYY-MM-DD]\033[0m"
+    )
+    print("  └─ Query stored detections from the database.")
+    print("  └─ Type 'history help' to view filter options")
 
     # Command: Devices
     print("\n  \033[94mdevices\033[0m")
