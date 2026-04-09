@@ -1,31 +1,96 @@
 from capture.classes.PyPacket import PyPacket
+from database.edit import add_detection
+import time
 
 class _SourceState:
-    def __init__(self, packet_count=0, risk=0):
-        self.packet_count = packet_count
-        self.risk = risk
+    def __init__(self, ip):
+        self.ip = ip
+        self.packets = [] # Holds PyPackets
+        self.packet_count = 0
+        self.risk = 0
         
-    def _increment(self):
+    def _increment(self, packet: PyPacket):
+        self.packets.append(packet)
         self.packet_count += 1
         
-    def _calculate_risk(self):
-        self.risk = ...
+    def _clean_packets(self, interval):
+        now = time.time()
+        cutoff = now - interval # The windows where packets are still kept and tracked
+        
+        self.packets = [packet for packet in self.packets if packet.timestamp >= cutoff] # Gets rid of packets not in the cutoff
+        
+    def _calculate_risk(self, payload_len):
+        '''
+        128 byte payload = 1.28 * num_packets
+        1000 byte payload  = 10 * num packets
+        '''
+        self.risk = (payload_len * 0.01) * self.packet_count 
 
 class IcmpTunnel:
-    def __init__(self, alert_callback=None):
+    def __init__(self, interval=60, alert_callback=None):
         self.alert_callback = alert_callback
+        self.interval = interval
         self.activity = {} # Maps source IP to SourceState, which tracks packet_count and risk
         
     def process_packet(self, packet: PyPacket):
-        if not packet.payload or packet.src_ip:
+        print(f"DEBUG: {packet.protocol} Packet received")
+        if not packet.payload or not packet.src_ip:
+            print(f"DEBUG: IP or payload missing")
             return
         
         payload_len = len(packet.payload)
+        print(f"DEBUG: Payload length: {payload_len}")
         
         if packet.src_ip not in self.activity:
-            self.activity[packet.src_ip] = _SourceState()
-        packet_state: _SourceState = self.activity[packet.src_ip]
+            self.activity[packet.src_ip] = _SourceState(packet.src_ip)
+        source_state: _SourceState = self.activity[packet.src_ip]
         
-        packet_state._increment()
+        source_state._increment(packet)
+        source_state._clean_packets(self.interval)
         
+        source_state._calculate_risk(payload_len)
+        risk = source_state.risk
+        print(f"DEBUG: Risk: {risk}")
         
+        if (5.0 <= risk < 7.5):
+            self.detected("medium", packet, source_state)
+        elif (7.5 <= risk < 10):
+            self.detected("high", packet, source_state)
+        elif (10 <= risk):
+            self.detected("critical", packet, source_state)
+        
+    def detected(self, severity, packet: PyPacket, source_state: _SourceState):
+        summary = f"Packet(s) from {source_state.ip} may contain suspicious payload(s)"
+        details = f"Calculated risk: {source_state.risk}\nPayloads:\n"
+        for pkt in source_state.packets:
+            details += f"Time: {pkt.timestamp} | Payload: {pkt.payload}\n"
+            
+        if self.alert_callback:
+            self.alert_callback(
+                severity,
+                "ICMP TUNNELING",
+                f"Suspiscious payload(s) from {source_state.ip} ({source_state.packet_count} packets sent)"
+            )
+            
+        add_detection(
+            detector_type="ICMP Tunnel", 
+            severity=severity, 
+            summary=summary, 
+            src_ip=packet.src_ip, 
+            src_mac=packet.src_mac, 
+            src_port=packet.src_port, dst_ip=
+            packet.dst_ip, dst_mac=
+            packet.dst_mac, dst_port=
+            packet.dst_port, details=
+            details)
+        
+def detect_icmp_tunnel(packet_queue, stop_event, cli_ready, alert_callback=None):
+    detector = IcmpTunnel(alert_callback=alert_callback)
+    print("DEBUG: ICMP Tunnel detector initiated")
+
+    while not stop_event.is_set() and cli_ready.is_set():
+        packet = packet_queue.get()
+        try:
+            detector.process_packet(packet)
+        finally:
+            packet_queue.task_done()

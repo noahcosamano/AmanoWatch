@@ -195,6 +195,7 @@ class MainWindow(QMainWindow):
             ("sweep",       "ICMP Sweep",       True),
             ("arp",         "ARP Spoof",        True),
             ("dns_tunnel",  "DNS Tunnel",       True),
+            ("icmp_tunnel", "ICMP Tunnel",      True),
             ("honey_port",  "Honey Port",       True),
         ):
             cb = QCheckBox(label)
@@ -326,6 +327,7 @@ class MainWindow(QMainWindow):
             "sweep":      "ICMP Sweep",
             "arp":        "ARP Spoof",
             "dns_tunnel": "DNS Tunnel",
+            "icmp_tunnel": "ICMP Tunnel",
             "honey_port": "Honey Port",
         }.get(key, key)
         verb = "enabled" if checked else "disabled"

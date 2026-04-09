@@ -4,7 +4,7 @@ from capture.config.config import protocol_nums, tcp_service_ports, udp_service_
 # app_protocol_num: application layer protocol e.g. 207 (MDNS)
 # All app_protocol numbers are defined myself, not real IEEE standard, defaults to 0.
 def parse_protocol(protocol_num, app_protocol_num):
-    protocol = protocol_nums[protocol_num] # Gets string format protocol from uint8_t format from config.py
+    protocol = protocol_nums.get(protocol_num, "UNKNOWN") # Gets string format protocol from uint8_t format from config.py
     if protocol == "TCP":
         # If a match is found in tcp_service_ports, protocol = that protocol, if not it defaults to TCP
         protocol = tcp_service_ports.get(app_protocol_num, "TCP")
@@ -18,6 +18,6 @@ def parse_protocol(protocol_num, app_protocol_num):
     elif protocol == "IGMP":
         return protocol
     else: # Should never happen if program is made well, all protocols should be defined.
-        protocol = "UNKNOWN"
+        return protocol
         
     return protocol

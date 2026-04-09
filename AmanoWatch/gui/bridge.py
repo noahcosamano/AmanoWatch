@@ -19,6 +19,7 @@ from detect.icmp_sweep import detect_sweep
 from detect.arp_spoof import detect_arp_spoof
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.honey_ports import detect_honey_port_connection
+from detect.icmp_tunnel import detect_icmp_tunnel
 
 # Real pcap_stats() wrapper — returns (recv, drop, ifdrop)
 try:
@@ -28,7 +29,7 @@ except ImportError:
         return (0, 0, 0)
 
 
-DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp", "dns_tunnel", "honey_port")
+DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp", "dns_tunnel", "icmp_tunnel", "honey_port")
 
 
 # ── Bridge ─────────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ class CaptureBridge(QObject):
             "sweep":      queue.Queue(),
             "arp":        queue.Queue(),
             "dns_tunnel": queue.Queue(),
+            "icmp_tunnel": queue.Queue(),
             "honey_port": queue.Queue(),
         }
         self._det_threads = {k: None for k in DETECTOR_KEYS}
@@ -139,6 +141,7 @@ class CaptureBridge(QObject):
                 self.device_path.encode(),
                 self._det_queues["arp"],
                 self._det_queues["dns_tunnel"],
+                self._det_queues["icmp_tunnel"],
                 self._det_queues["honey_port"],
                 self._det_queues["fast_scan"],
                 self._det_queues["slow_scan"],
@@ -190,6 +193,9 @@ class CaptureBridge(QObject):
                 q, 30, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "dns_tunnel":
             target = lambda: detect_dns_tunnel(
+                q, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "icmp_tunnel":
+            target = lambda: detect_icmp_tunnel(
                 q, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "honey_port":
             target = lambda: detect_honey_port_connection(

@@ -5,6 +5,7 @@ from detect.icmp_sweep import detect_sweep
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.arp_spoof import detect_arp_spoof
 from detect.honey_ports import detect_honey_port_connection
+from detect.icmp_tunnel import detect_icmp_tunnel
 from database.init_db import init_db
 from database.edit import purge_low_severity
 import threading
@@ -39,8 +40,9 @@ def main():
     slow_scan_queue = queue.Queue()
     fast_scan_queue = queue.Queue()
     arp_queue = queue.Queue()
-    icmp_queue = queue.Queue()
+    icmp_sweep_queue = queue.Queue()
     dns_queue = queue.Queue()
+    icmp_tunnel_queue = queue.Queue()
     honey_port_queue = queue.Queue()
     
     # All threads are set to daemon=True to end when program ends
@@ -60,8 +62,8 @@ def main():
     capture_thread = threading.Thread(
         target=begin_capture,
         args=(
-            device_path, arp_queue, dns_queue, honey_port_queue, slow_scan_queue, 
-            fast_scan_queue, icmp_queue, cli_queue, stop_event, cli_ready_event
+            device_path, arp_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, slow_scan_queue, 
+            fast_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready_event
         ),
         name="CAPTURE",
         daemon=True
@@ -89,7 +91,7 @@ def main():
                                      # very deprecated compared to rest of program
         target=detect_sweep,
         # queue, interval, quantity, cooldown, stop event, cli ready event
-        args=(icmp_queue, 5, 10, 30, stop_event, cli_ready_event),
+        args=(icmp_sweep_queue, 5, 10, 30, stop_event, cli_ready_event),
         name="SWEEP",
         daemon=True
     )
@@ -111,6 +113,13 @@ def main():
         daemon=True
     )
     
+    icmp_tunnel_thread = threading.Thread(
+        target=detect_icmp_tunnel,
+        args=(icmp_tunnel_queue, stop_event, cli_ready_event),
+        name="ICMP TUNNEL",
+        daemon=True
+    )
+    
     honey_port_thread = threading.Thread(
         target=detect_honey_port_connection,
         args=(device_name, honey_port_queue, stop_event, cli_ready_event),
@@ -125,6 +134,7 @@ def main():
     sweep_thread.start()
     arp_spoof_thread.start()
     dns_tunnel_thread.start()
+    icmp_tunnel_thread.start()
     honey_port_thread.start()
     
     try:
@@ -144,6 +154,7 @@ def main():
         sweep_thread.join(timeout=1)
         arp_spoof_thread.join(timeout=1)
         dns_tunnel_thread.join(timeout=1)
+        icmp_tunnel_thread.join(timeout=1)
         honey_port_thread.join(timeout=1)
 
 main()
