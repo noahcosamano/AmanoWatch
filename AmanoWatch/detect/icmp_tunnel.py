@@ -9,9 +9,11 @@ class _SourceState:
         self.packet_count = 0
         self.risk = 0
         
-    def _increment(self, packet: PyPacket):
+    def _add_packet(self, packet: PyPacket):
         self.packets.append(packet)
-        self.packet_count += 1
+    
+    def _update_packet_count(self):
+        self.packet_count = len(self.packets)
         
     def _clean_packets(self, interval):
         now = time.time()
@@ -24,7 +26,8 @@ class _SourceState:
         128 byte payload = 1.28 * num_packets
         1000 byte payload  = 10 * num packets
         '''
-        self.risk = (payload_len * 0.01) * self.packet_count 
+        total_bytes = sum(len(packet.payload) for packet in self.packets if packet.payload)
+        self.risk = total_bytes * 0.01
 
 class IcmpTunnel:
     def __init__(self, interval=60, alert_callback=None):
@@ -45,8 +48,9 @@ class IcmpTunnel:
             self.activity[packet.src_ip] = _SourceState(packet.src_ip)
         source_state: _SourceState = self.activity[packet.src_ip]
         
-        source_state._increment(packet)
+        source_state._add_packet(packet)
         source_state._clean_packets(self.interval)
+        source_state._update_packet_count()
         
         source_state._calculate_risk(payload_len)
         risk = source_state.risk
