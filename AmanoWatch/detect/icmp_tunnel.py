@@ -21,10 +21,13 @@ class _SourceState:
         
         self.packets = [packet for packet in self.packets if packet.timestamp >= cutoff] # Gets rid of packets not in the cutoff
         
-    def _calculate_risk(self, payload_len):
+    def _calculate_risk(self):
         '''
-        128 byte payload = 1.28 * num_packets
-        1000 byte payload  = 10 * num packets
+        Risk scales linearly with total payload bytes in the window.
+            1 byte  → 0.01 risk
+            500 bytes → 5.0 (medium threshold)
+            1000 bytes → 10.0 (critical threshold)
+        A single 1000-byte ping, or 10 × 100-byte pings, both hit critical.
         '''
         total_bytes = sum(len(packet.payload) for packet in self.packets if packet.payload)
         self.risk = total_bytes * 0.01
@@ -52,7 +55,7 @@ class IcmpTunnel:
         source_state._clean_packets(self.interval)
         source_state._update_packet_count()
         
-        source_state._calculate_risk(payload_len)
+        source_state._calculate_risk()
         risk = source_state.risk
         print(f"DEBUG: Risk: {risk}")
         
