@@ -6,6 +6,7 @@ from detect.config import FLAG_TO_NAME
 from database.edit import add_detection
 from collections import deque, defaultdict
 import time
+import queue
 import traceback
 
 

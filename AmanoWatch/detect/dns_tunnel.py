@@ -3,6 +3,7 @@ from detect.config import DNS_WHITELIST
 from database.edit import add_detection
 import math
 import time
+import queue
 from collections import Counter
 
 

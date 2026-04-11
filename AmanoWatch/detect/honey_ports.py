@@ -5,6 +5,7 @@ from network.block_ip import block_ip, unblock_ip
 from network.get_gateway import get_gateway
 from network.get_ip import get_ip
 from utils.geolocate_ip import search_ip
+import queue
 
 class HoneyPort:
     def __init__(self, device, packet_queue, alert_callback=None):
@@ -37,6 +38,7 @@ class HoneyPort:
             self.detect(packet, protocol, reason)
         
     def check_port(self, dst_port):
+        #print(f"DEBUG: Checking port {dst_port}")
         if dst_port in HONEY_PORTS.keys():
             protocol = HONEY_PORTS[dst_port].get("protocol")
             reason = HONEY_PORTS[dst_port].get("reason")

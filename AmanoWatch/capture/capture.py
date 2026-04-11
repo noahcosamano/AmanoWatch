@@ -25,8 +25,8 @@ def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
     return PyPacket(dst_mac, src_mac, protocol, type, src_ip, dst_ip,
                     src_port, dst_port, flags, query, query_len, timestamp)
 
-def _route(arp_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_q, icmp_sweep_q, 
-           cli_q, packet: PyPacket, cli_skip: int, cli_counter: int):
+def _route(arp_spoof_q, arp_scan_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_q, 
+           icmp_sweep_q, cli_q, packet: PyPacket, cli_skip: int, cli_counter: int):
     """
     Route a packet to relevant detector queues.
     Returns the updated cli_counter.
@@ -34,7 +34,8 @@ def _route(arp_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_q, icmp_sweep_q,
     proto = packet.protocol
 
     if proto == "ARP":
-        arp_q.put(packet)
+        arp_spoof_q.put(packet)
+        arp_scan_q.put(packet)
     elif proto == "DNS":
         dns_q.put(packet)
     elif proto in ("TCP", "UDP"):
@@ -52,8 +53,8 @@ def _route(arp_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_q, icmp_sweep_q,
     return cli_counter + 1
 
 
-def begin_capture(device, arp_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, fast_scan_queue,
-                  slow_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready):
+def begin_capture(device, arp_scan_queue, arp_spoof_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, 
+                  fast_scan_queue, slow_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready):
     
     PCAP_ERRBUF_SIZE = 256
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
@@ -120,7 +121,7 @@ def begin_capture(device, arp_queue, dns_queue, icmp_tunnel_queue, honey_port_qu
                         raw_payload, payload_len, cpacket.tv_sec)
 
                     cli_counter = _route(
-                        arp_queue, dns_queue, icmp_tunnel_queue, honey_port_queue,
+                        arp_spoof_queue, arp_scan_queue, dns_queue, icmp_tunnel_queue, honey_port_queue,
                         fast_scan_queue, slow_scan_queue, icmp_sweep_queue,
                         cli_queue, pypacket, cli_skip, cli_counter)
 

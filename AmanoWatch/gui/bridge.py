@@ -17,6 +17,7 @@ from capture.classes.PyPacket import PyPacket
 from detect.port_scan import detect_port_scan
 from detect.icmp_sweep import detect_sweep
 from detect.arp_spoof import detect_arp_spoof
+from detect.arp_scan import detect_arp_scan
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.honey_ports import detect_honey_port_connection
 from detect.icmp_tunnel import detect_icmp_tunnel
@@ -29,7 +30,7 @@ except ImportError:
         return (0, 0, 0)
 
 
-DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp", "dns_tunnel", "icmp_tunnel", "honey_port")
+DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp_spoof", "arp_scan", "dns_tunnel", "icmp_tunnel", "honey_port")
 
 
 # ── Bridge ─────────────────────────────────────────────────────────────────────
@@ -65,7 +66,8 @@ class CaptureBridge(QObject):
             "fast_scan":  queue.Queue(),
             "slow_scan":  queue.Queue(),
             "sweep":      queue.Queue(),
-            "arp":        queue.Queue(),
+            "arp_spoof":  queue.Queue(),
+            "arp_scan":   queue.Queue(),
             "dns_tunnel": queue.Queue(),
             "icmp_tunnel": queue.Queue(),
             "honey_port": queue.Queue(),
@@ -139,7 +141,8 @@ class CaptureBridge(QObject):
         def _capture_real():
             begin_capture(
                 self.device_path.encode(),
-                self._det_queues["arp"],
+                self._det_queues["arp_spoof"],
+                self._det_queues["arp_scan"],
                 self._det_queues["dns_tunnel"],
                 self._det_queues["icmp_tunnel"],
                 self._det_queues["honey_port"],
@@ -188,9 +191,12 @@ class CaptureBridge(QObject):
                 device, q, 60, 50, 30, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "sweep":
             target = lambda: detect_sweep(q, 5, 10, 300, stop_ev, ready)
-        elif key == "arp":
+        elif key == "arp_spoof":
             target = lambda: detect_arp_spoof(
                 q, 30, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "arp_scan":
+            target = lambda: detect_arp_scan(
+                q, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "dns_tunnel":
             target = lambda: detect_dns_tunnel(
                 q, stop_ev, ready, alert_callback=_emit_alert)

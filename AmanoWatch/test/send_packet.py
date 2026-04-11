@@ -9,7 +9,7 @@ import warnings
 # Suppress the iface warning — we're sending to loopback so iface has no effect
 warnings.filterwarnings("ignore", message=".*iface.*has no effect.*")
 
-DST_IP  = "129.21.102.104"
+DST_IP  = "129.21.105.81"
 SRC_IP  = "192.168.1.2"
 SRC_MAC = "56:1A:7D:3F:4B:6C"
 DST_MAC = "41:1A:7D:3F:4B:6C"
@@ -98,9 +98,22 @@ def main():
     send_arp(DST_IP, SRC_IP, "aa:bb:cc:dd:ee:ff", 1) # Initialize ARP
     send_arp(DST_IP, SRC_IP, "bb:bb:cc:dd:ee:ff", 1) # Change ARP
     
+    # ARP Scan
+    send_arp("129.21.102.104", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.114", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.124", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.134", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.144", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.154", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.164", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.174", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.184", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.194", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    send_arp("129.21.102.204", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
+    
     # Honeyport
-    #send_packet("TCP", DST_IP, SRC_IP, 9999, 21, None, None, 1)  # FTP honeyport
-    #send_packet("TCP", DST_IP, SRC_IP, 9999, 23, None, None, 1)  # Telnet honeyport (port 23!)
+    send_packet("TCP", DST_IP, SRC_IP, 9999, 21, None, None, 1)  # FTP honeyport
+    send_packet("TCP", DST_IP, SRC_IP, 9999, 23, None, None, 1)  # Telnet honeyport (port 23!)
     
     # DNS Tunnel
     send_dns(1)

@@ -1,6 +1,7 @@
 from capture.classes.PyPacket import PyPacket
 from database.edit import add_detection
 import time
+import queue
 
 class _SourceState:
     def __init__(self, ip):
@@ -91,7 +92,6 @@ class IcmpTunnel:
         
 def detect_icmp_tunnel(packet_queue, stop_event, cli_ready, alert_callback=None):
     detector = IcmpTunnel(alert_callback=alert_callback)
-    print("DEBUG: ICMP Tunnel detector initiated")
 
     while not stop_event.is_set() and cli_ready.is_set():
         packet = packet_queue.get()

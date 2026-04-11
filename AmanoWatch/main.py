@@ -4,6 +4,7 @@ from detect.port_scan import detect_port_scan
 from detect.icmp_sweep import detect_sweep
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.arp_spoof import detect_arp_spoof
+from detect.arp_scan import detect_arp_scan
 from detect.honey_ports import detect_honey_port_connection
 from detect.icmp_tunnel import detect_icmp_tunnel
 from database.init_db import init_db
@@ -39,7 +40,8 @@ def main():
     cli_queue = queue.Queue() 
     slow_scan_queue = queue.Queue()
     fast_scan_queue = queue.Queue()
-    arp_queue = queue.Queue()
+    arp_spoof_queue = queue.Queue()
+    arp_scan_queue = queue.Queue()
     icmp_sweep_queue = queue.Queue()
     dns_queue = queue.Queue()
     icmp_tunnel_queue = queue.Queue()
@@ -62,8 +64,8 @@ def main():
     capture_thread = threading.Thread(
         target=begin_capture,
         args=(
-            device_path, arp_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, slow_scan_queue, 
-            fast_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready_event
+            device_path, arp_spoof_queue, arp_scan_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, 
+            slow_scan_queue, fast_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready_event
         ),
         name="CAPTURE",
         daemon=True
@@ -99,8 +101,15 @@ def main():
     arp_spoof_thread = threading.Thread(
         target=detect_arp_spoof, 
         # queue, cooldown, stop event, cli ready event
-        args=(arp_queue, 30, stop_event, cli_ready_event),
+        args=(arp_spoof_queue, 30, stop_event, cli_ready_event),
         name="ARP SPOOF",
+        daemon=True
+    )
+    
+    arp_scan_thread = threading.Thread(
+        target=detect_arp_scan,
+        args=(arp_scan_queue, stop_event, cli_ready_event),
+        name="ARP SCAN",
         daemon=True
     )
     
@@ -133,6 +142,7 @@ def main():
     slow_scan_thread.start()
     sweep_thread.start()
     arp_spoof_thread.start()
+    arp_scan_thread.start()
     dns_tunnel_thread.start()
     icmp_tunnel_thread.start()
     honey_port_thread.start()
@@ -153,6 +163,7 @@ def main():
         slow_scan_thread.join(timeout=1)
         sweep_thread.join(timeout=1)
         arp_spoof_thread.join(timeout=1)
+        arp_scan_thread.join(timeout=1)
         dns_tunnel_thread.join(timeout=1)
         icmp_tunnel_thread.join(timeout=1)
         honey_port_thread.join(timeout=1)
