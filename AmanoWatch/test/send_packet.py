@@ -9,7 +9,7 @@ import warnings
 # Suppress the iface warning — we're sending to loopback so iface has no effect
 warnings.filterwarnings("ignore", message=".*iface.*has no effect.*")
 
-DST_IP  = "129.21.105.81"
+DST_IP  = "137.238.215.189"
 SRC_IP  = "192.168.1.2"
 SRC_MAC = "56:1A:7D:3F:4B:6C"
 DST_MAC = "41:1A:7D:3F:4B:6C"

@@ -44,7 +44,7 @@ class ArpSpoof:
         
         add_detection(
             detector_type="ARP Spoof", 
-            severity="CRITICAL", 
+            severity="critical", 
             summary=summary, 
             src_ip=packet.src_ip, 
             src_mac=old_mac, 
