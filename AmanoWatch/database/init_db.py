@@ -1,8 +1,8 @@
 import sqlite3
 import os
 
-DB_PATH = "AmanoWatch/database/amanowatch.db"
-SCHEMA_PATH = "AmanoWatch/database/schema.sql"
+DB_PATH = os.path.join(os.path.dirname(__file__), "amanowatch.db")
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)

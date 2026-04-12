@@ -1,6 +1,7 @@
 import sqlite3
+import os
 
-DB_PATH = "AmanoWatch/database/amanowatch.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "amanowatch.db")
 
 
 def query(n=None, ip=None, mac=None, port=None, severity=None,
