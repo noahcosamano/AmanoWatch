@@ -197,7 +197,8 @@ class MainWindow(QMainWindow):
             ("arp_scan",    "ARP Scan",         True),
             ("dns_tunnel",  "DNS Tunnel",       True),
             ("icmp_tunnel", "ICMP Tunnel",      True),
-            ("honey_port",  "Honey Port",       True),
+            ("honey_port",  "Honey Port (Very Noisy)",       True),
+            ("brute_force", "Brute Force",      True)
         ):
             cb = QCheckBox(label)
             cb.setChecked(default)
@@ -331,6 +332,7 @@ class MainWindow(QMainWindow):
             "dns_tunnel": "DNS Tunnel",
             "icmp_tunnel": "ICMP Tunnel",
             "honey_port": "Honey Port",
+            "brute_force": "Brute Force"
         }.get(key, key)
         verb = "enabled" if checked else "disabled"
         self._status_lbl.setText(f"{label} detector {verb}")

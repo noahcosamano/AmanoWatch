@@ -227,29 +227,35 @@ class StreamPanel(QWidget):
     # ── Slot: receive packet from bridge ─────────────────────────────────────
     @pyqtSlot(object)
     def on_packet(self, pkt):
-        # Always buffer so filter changes can replay history
         self._history.append(pkt)
         if len(self._history) > MAX_HISTORY:
             self._history.pop(0)
 
-        # Harvest autocomplete tokens
         for v in (getattr(pkt, 'src_ip', None),
-                  getattr(pkt, 'dst_ip', None),
-                  getattr(pkt, 'protocol', None),
-                  str(getattr(pkt, 'src_port', '') or ''),
-                  str(getattr(pkt, 'dst_port', '') or '')):
+                getattr(pkt, 'dst_ip', None),
+                getattr(pkt, 'protocol', None),
+                str(getattr(pkt, 'src_port', '') or ''),
+                str(getattr(pkt, 'dst_port', '') or '')):
             if v:
                 self._suggestions.add(str(v))
 
         if self._capturing:
-            self._pending.append(pkt)
+            # Don't let pending grow unbounded — cap at 500
+            if len(self._pending) < 500:
+                self._pending.append(pkt)
 
     # ── Batch flush ───────────────────────────────────────────────────────────
     def _flush(self):
         if not self._pending:
             return
 
-        batch, self._pending = self._pending, []
+        # If backlog is huge, drop old packets — only show the latest 100
+        if len(self._pending) > 200:
+            dropped = len(self._pending) - 100
+            self._pending = self._pending[-100:]  # keep newest only
+            self._status_lbl.setText(f"Display dropping {dropped} packets (capturing all)")
+
+        batch, self._pending = self._pending[:100], self._pending[100:]
 
         # Snapshot scroll state BEFORE inserting. New rows go in at index 0
         # (top), so if the user is at the top they want to follow the stream;

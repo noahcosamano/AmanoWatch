@@ -11,7 +11,7 @@ import ctypes
 
 # PACKET_BATCH_SZIE acts as a ceiling. C returns early on pcap timeout (100ms),
 # so on quiet links you get whatever's ready after 100ms regardless of size.
-PACKET_BATCH_SIZE = 1000
+PACKET_BATCH_SIZE = 50
 
 # GUI sampling — only forward 1 in N packets to the CLI queue under load.
 # The GUI only displays ~500 rows anyway and batches on a 60ms timer, so
@@ -26,7 +26,7 @@ def convert_to_pypacket(protocol, type, flags, src_mac, dst_mac, src_ip, dst_ip,
                     src_port, dst_port, flags, query, query_len, timestamp)
 
 def _route(arp_spoof_q, arp_scan_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_q, 
-           icmp_sweep_q, cli_q, packet: PyPacket, cli_skip: int, cli_counter: int):
+           icmp_sweep_q, brute_force_q, cli_q, packet: PyPacket, cli_skip: int, cli_counter: int):
     """
     Route a packet to relevant detector queues.
     Returns the updated cli_counter.
@@ -38,7 +38,12 @@ def _route(arp_spoof_q, arp_scan_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_
         arp_scan_q.put(packet)
     elif proto == "DNS":
         dns_q.put(packet)
-    elif proto in ("TCP", "UDP"):
+    elif proto == "TCP":
+        fast_q.put(packet)
+        slow_q.put(packet)
+        honey_q.put(packet)
+        brute_force_q.put(packet)
+    elif proto == "UDP":
         fast_q.put(packet)
         slow_q.put(packet)
         honey_q.put(packet)
@@ -54,7 +59,7 @@ def _route(arp_spoof_q, arp_scan_q, dns_q, icmp_tunnel_q, honey_q, fast_q, slow_
 
 
 def begin_capture(device, arp_scan_queue, arp_spoof_queue, dns_queue, icmp_tunnel_queue, honey_port_queue, 
-                  fast_scan_queue, slow_scan_queue, icmp_sweep_queue, cli_queue, stop_event, cli_ready):
+                  fast_scan_queue, slow_scan_queue, icmp_sweep_queue, brute_force_q, cli_queue, stop_event, cli_ready):
     
     PCAP_ERRBUF_SIZE = 256
     errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
@@ -122,7 +127,7 @@ def begin_capture(device, arp_scan_queue, arp_spoof_queue, dns_queue, icmp_tunne
 
                     cli_counter = _route(
                         arp_spoof_queue, arp_scan_queue, dns_queue, icmp_tunnel_queue, honey_port_queue,
-                        fast_scan_queue, slow_scan_queue, icmp_sweep_queue,
+                        fast_scan_queue, slow_scan_queue, icmp_sweep_queue, brute_force_q,
                         cli_queue, pypacket, cli_skip, cli_counter)
 
                 packets_since_check += count

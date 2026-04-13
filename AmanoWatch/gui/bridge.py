@@ -21,6 +21,7 @@ from detect.arp_scan import detect_arp_scan
 from detect.dns_tunnel import detect_dns_tunnel
 from detect.honey_ports import detect_honey_port_connection
 from detect.icmp_tunnel import detect_icmp_tunnel
+from detect.brute_force import detect_brute_force
 
 # Real pcap_stats() wrapper — returns (recv, drop, ifdrop)
 try:
@@ -30,7 +31,8 @@ except ImportError:
         return (0, 0, 0)
 
 
-DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp_spoof", "arp_scan", "dns_tunnel", "icmp_tunnel", "honey_port")
+DETECTOR_KEYS = ("fast_scan", "slow_scan", "sweep", "arp_spoof", "arp_scan", 
+                 "dns_tunnel", "icmp_tunnel", "honey_port", "brute_force")
 
 
 # ── Bridge ─────────────────────────────────────────────────────────────────────
@@ -71,6 +73,7 @@ class CaptureBridge(QObject):
             "dns_tunnel": queue.Queue(),
             "icmp_tunnel": queue.Queue(),
             "honey_port": queue.Queue(),
+            "brute_force": queue.Queue()
         }
         self._det_threads = {k: None for k in DETECTOR_KEYS}
         self._cli_q = None
@@ -149,6 +152,7 @@ class CaptureBridge(QObject):
                 self._det_queues["fast_scan"],
                 self._det_queues["slow_scan"],
                 self._det_queues["sweep"],
+                self._det_queues["brute_force"],
                 self._cli_q,
                 self.stop_event,
                 ready
@@ -206,6 +210,10 @@ class CaptureBridge(QObject):
         elif key == "honey_port":
             target = lambda: detect_honey_port_connection(
                 device, q, stop_ev, ready, alert_callback=_emit_alert)
+        elif key == "brute_force":
+            target = lambda: detect_brute_force(
+                q, stop_ev, ready, alert_callback=_emit_alert
+            )
         else:
             return
 

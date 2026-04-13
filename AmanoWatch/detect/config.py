@@ -84,3 +84,5 @@ HONEY_PORTS = {
     # Special
     0:     {"protocol": "Reserved / Invalid",                    "reason": "Scanning port 0 is an OS fingerprinting technique — never legitimate"},
 }
+
+BRUTE_PORTS = {21, 22, 23, 3389, 5900, 80, 443, 8080}

@@ -5,6 +5,7 @@ from scapy.sendrecv import send, sendp
 import base64
 import os
 import warnings
+from time import sleep
 
 # Suppress the iface warning — we're sending to loopback so iface has no effect
 warnings.filterwarnings("ignore", message=".*iface.*has no effect.*")
@@ -93,10 +94,17 @@ def main():
     ports = []
     for num in range(30):
         ports.append(num)
+        
+    # Brute Force
+    send_brute_force(num_attempts=50)
+    
+    sleep(5)
     
     # ARP Spoof
     send_arp(DST_IP, SRC_IP, "aa:bb:cc:dd:ee:ff", 1) # Initialize ARP
     send_arp(DST_IP, SRC_IP, "bb:bb:cc:dd:ee:ff", 1) # Change ARP
+    
+    sleep(5)
     
     # ARP Scan
     send_arp("129.21.102.104", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
@@ -111,12 +119,16 @@ def main():
     send_arp("129.21.102.194", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
     send_arp("129.21.102.204", SRC_IP, "aa:bb:cc:dd:ee:ff", 1)
     
+    sleep(5)
+    
     # Honeyport
     send_packet("TCP", DST_IP, SRC_IP, 9999, 21, None, None, 1)  # FTP honeyport
     send_packet("TCP", DST_IP, SRC_IP, 9999, 23, None, None, 1)  # Telnet honeyport (port 23!)
     
     # DNS Tunnel
     send_dns(1)
+    
+    sleep(5)
     
     # SYN Scan
     send_port_scan(ports, "S") # SYN scan
