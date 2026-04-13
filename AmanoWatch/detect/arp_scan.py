@@ -1,5 +1,6 @@
 from capture.classes.PyPacket import PyPacket
 from database.edit import add_detection
+from network.get_ip import get_ip
 from queue import Queue
 from threading import Event
 import time
@@ -8,7 +9,7 @@ class _SourceState:
     def __init__(self, ip):
         self.ip = ip
         self.entries = [] # List of dicts {packet: PyPacket, dst_ip, timestamp}
-        self.unique_ips = set()
+        self.unique_ips = set() 
         self.risk = 0
         
     def add(self, packet: PyPacket):
@@ -54,16 +55,23 @@ class _SourceState:
         return len(self.entries)
     
 class ArpScan:
-    def __init__(self, interval=60, cooldown=30, alert_callback=None):
+    def __init__(self, device, interval=60, cooldown=30, alert_callback=None):
         self.interval = interval
         self.cooldown = cooldown
         self.alert_callback = alert_callback
+        self.host_ip = get_ip(device)
         self.activity = {} # src_ip -> _SourceState
         self.last_alert = {} # src_ip -> timestamp
         self.last_severity = {}
         
+        if self.host_ip:
+            self.host_ip = self.host_ip.replace("(Preferred)", "").strip()
+        
     def process_packet(self, packet: PyPacket):
         if not packet.src_ip or not packet.dst_ip:
+            return
+        
+        if self.host_ip and packet.src_ip == self.host_ip:
             return
         
         if packet.src_ip not in self.activity:
@@ -139,8 +147,8 @@ class ArpScan:
             details=details,
         )
         
-def detect_arp_scan(packet_queue: Queue, stop_event: Event, cli_ready: Event, alert_callback=None):
-    detector = ArpScan(alert_callback=alert_callback)
+def detect_arp_scan(device, packet_queue: Queue, stop_event: Event, cli_ready: Event, alert_callback=None):
+    detector = ArpScan(device, alert_callback=alert_callback)
     
     while not stop_event.is_set() and cli_ready.is_set():
         packet = packet_queue.get()

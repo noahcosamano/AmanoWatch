@@ -5,8 +5,7 @@ from threading import Event
 from queue import Queue
 
 class ArpSpoof:
-    def __init__(self, packet_queue, cooldown, alert_callback=None):
-        self.packet_queue = packet_queue
+    def __init__(self, cooldown, alert_callback=None):
         self.cooldown = cooldown
         self.arp_table = {}
         self.last_alert = {} # source mac: timestamp
@@ -57,7 +56,7 @@ class ArpSpoof:
             details=None)
         
 def detect_arp_spoof(packet_queue: Queue, cooldown, stop_event: Event, cli_ready: Event, alert_callback=None):
-    detector = ArpSpoof(packet_queue, cooldown, alert_callback=alert_callback)
+    detector = ArpSpoof(cooldown, alert_callback=alert_callback)
     
     while not stop_event.is_set() and cli_ready.is_set():
         unblock_mac()

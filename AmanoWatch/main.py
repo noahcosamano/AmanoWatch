@@ -7,6 +7,7 @@ from detect.arp_spoof import detect_arp_spoof
 from detect.arp_scan import detect_arp_scan
 from detect.honey_ports import detect_honey_port_connection
 from detect.icmp_tunnel import detect_icmp_tunnel
+from detect.brute_force import detect_brute_force
 from database.init_db import init_db
 from database.edit import purge_low_severity
 import threading
@@ -46,6 +47,7 @@ def main():
     dns_queue = queue.Queue()
     icmp_tunnel_queue = queue.Queue()
     honey_port_queue = queue.Queue()
+    brute_force_thread = queue.Queue()
     
     # All threads are set to daemon=True to end when program ends
     # All thread names are for debugging
@@ -135,6 +137,13 @@ def main():
         name="HONEY PORT",
         daemon=True
     )
+    
+    brute_force_thread = threading.Thread(
+        target=detect_brute_force,
+        args=(device_name, stop_event, cli_ready_event),
+        name="BRUTE FORCE",
+        daemon=True
+    )
 
     # Need to find a way to prevent so many threads being used, going to slow program
     capture_thread.start()
@@ -146,6 +155,7 @@ def main():
     dns_tunnel_thread.start()
     icmp_tunnel_thread.start()
     honey_port_thread.start()
+    brute_force_thread.start()
     
     try:
         while cli_thread.is_alive():
@@ -167,5 +177,6 @@ def main():
         dns_tunnel_thread.join(timeout=1)
         icmp_tunnel_thread.join(timeout=1)
         honey_port_thread.join(timeout=1)
+        brute_force_thread.join(timeout=1)
 
 main()

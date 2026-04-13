@@ -200,7 +200,7 @@ class CaptureBridge(QObject):
                 q, 30, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "arp_scan":
             target = lambda: detect_arp_scan(
-                q, stop_ev, ready, alert_callback=_emit_alert)
+                device, q, stop_ev, ready, alert_callback=_emit_alert)
         elif key == "dns_tunnel":
             target = lambda: detect_dns_tunnel(
                 q, stop_ev, ready, alert_callback=_emit_alert)

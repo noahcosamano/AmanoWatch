@@ -52,8 +52,7 @@ class PortScan:
         if not src_ip or not dst_port:
             return
 
-        # NOTE: "128." is a temporary loopback-testing hack — change back to "127."
-        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("128."):
+        if (self.gateway and src_ip == self.gateway) or src_ip.startswith("127."):
             return
 
         # Ignore our own outbound traffic so replies don't get counted as scans
