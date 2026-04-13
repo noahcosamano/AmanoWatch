@@ -16,7 +16,7 @@
 - **Real-Time Threat Detection** — Identifies port scans, ARP scans, ICMP sweeps, ARP spoofing, DNS/ICMP tunneling, and honeyport connections as they happen.
 - **Traffic Viewer** — Filter and inspect live network traffic by protocol, port, and interface.
 - **Multithreaded Architecture** — Separates packet capture, parsing, and detection into dedicated threads for speed and memory efficiency.
-- **Persistent Logging** — All detections are stored in a local SQL database for filtering, searching, and review.
+- **Persistent Logging** — All detections are stored in a local SQL database for filtering, searching, and review. Past history is viewed in AmanoWatchLite (CLI version)
 
 ---
 
